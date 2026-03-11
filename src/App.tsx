@@ -49,12 +49,12 @@ export default function App() {
     {
       value: 'Academic Survey',
       label: 'Academic Survey',
-      description: 'Academic papers, methods, and research trends'
+      description: 'Literature-based overview of academic papers, methods, and research trends.'
     },
     {
       value: 'Industry Report',
       label: 'Industry Report',
-      description: 'Web and industry sources, markets, players, and signals'
+      description: 'Insights from web and industry sources, including markets, companies, and emerging signals.'
     }
   ];
 
@@ -63,13 +63,13 @@ export default function App() {
       value: 'Short version',
       label: 'Short version',
       detail: '3-5 minutes',
-      description: 'Quick paper-based summary'
+      description: 'Rapid structured overview, lighter than deep research'
     },
     {
       value: 'Standard version',
       label: 'Standard version',
       detail: '1-2 hours',
-      description: 'Broader paper-based survey'
+      description: 'Evidence-traced survey draft with balanced depth'
     }
   ];
 
@@ -1060,8 +1060,14 @@ export default function App() {
                                                 <div className={`text-[13px] font-semibold ${isSelected ? 'text-[#6b21a8]' : 'text-gray-800'}`}>
                                                   {option.label}
                                                 </div>
-                                                <div className={`mt-0.5 text-[11px] ${isSelected ? 'text-[#8b5cf6]' : 'text-gray-500'}`}>
-                                                  {option.detail}
+                                                <div className="mt-1">
+                                                  <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                                                    isSelected
+                                                      ? 'bg-[#ede9fe] text-[#7e22ce]'
+                                                      : 'bg-[#f5f3ff] text-[#7e22ce]'
+                                                  }`}>
+                                                    {option.detail}
+                                                  </span>
                                                 </div>
                                                 <div className={`mt-1 text-[11px] leading-4 ${isSelected ? 'text-[#7e22ce]' : 'text-gray-500'}`}>
                                                   {option.description}
@@ -1083,22 +1089,16 @@ export default function App() {
                                       <span className="w-5 h-5 rounded-full bg-[#f3e8ff] text-[#7e22ce] text-[11px] font-semibold flex items-center justify-center">2</span>
                                       <label className="text-xs font-medium text-gray-700">Estimated output</label>
                                     </div>
-                                    <div className="rounded-xl border border-[#e9d5ff] bg-[#faf7ff] px-4 py-3">
-                                      <div className="text-[13px] font-semibold text-[#6b21a8]">Industry Report</div>
-                                      <div className="mt-1 text-[12px] text-[#7e22ce]">10+ pages</div>
-                                      <div className="mt-2 text-[12px] leading-5 text-gray-500">
-                                        Web and industry sources, about 15 minutes.
+                                    <div className="rounded-xl border border-[#d8b4fe] bg-[#faf7ff] px-4 py-3">
+                                      <div className="text-[13px] font-semibold text-[#2f2854]">Industry Report</div>
+                                      <div className="mt-2">
+                                        <span className="inline-flex rounded-full bg-[#f5f3ff] px-2.5 py-1 text-[11px] font-medium text-[#7e22ce]">
+                                          15 minutes
+                                        </span>
                                       </div>
                                     </div>
                                   </div>
                                 )}
-                              </div>
-                              <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
-                                {selectedReportType
-                                  ? isAcademicSurvey
-                                    ? `Selected: ${selectedReportType.label} / ${selectedReportLength?.label ?? 'Choose length'}`
-                                    : 'Selected: Industry Report / 10+ pages / around 15 minutes'
-                                  : 'Choose a report type to continue.'}
                               </div>
                             </div>
                           )}
@@ -1208,9 +1208,9 @@ export default function App() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h3 className="text-[18px] font-semibold text-[#2a2136]">Choose report settings</h3>
+                        <h3 className="text-[18px] font-semibold text-[#2a2136]">Choose report type</h3>
                         <p className="mt-3 text-[15px] leading-6 text-[#6b7280]">
-                          Select the report type and length before generating your content.
+                          Choose the output type before generating. Academic Survey also lets you choose the survey depth.
                         </p>
                       </div>
                       <button
@@ -1223,7 +1223,7 @@ export default function App() {
 
                     <div className="mt-8 space-y-6">
                       <div>
-                        <div className="mb-3 text-[13px] font-medium text-[#4b5563]">Report type</div>
+                        <div className="mb-3 text-[13px] font-medium text-[#4b5563]">Choose report type</div>
                         <div className="space-y-3">
                           {reportTypeOptions.map((option) => {
                             const isSelected = reportType === option.value;
@@ -1269,7 +1269,15 @@ export default function App() {
                                   }`}
                                 >
                                   <div className="text-[15px] font-semibold text-[#2f2854]">{option.label}</div>
-                                  <div className="mt-1 text-[12px] text-[#8b5cf6]">{option.detail}</div>
+                                  <div className="mt-2">
+                                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                                      isSelected
+                                        ? 'bg-[#ede9fe] text-[#7e22ce]'
+                                        : 'bg-[#f5f3ff] text-[#7e22ce]'
+                                    }`}>
+                                      {option.detail}
+                                    </span>
+                                  </div>
                                   <div className="mt-2 text-[12px] leading-5 text-[#6b7280]">{option.description}</div>
                                 </button>
                               );
@@ -1280,10 +1288,12 @@ export default function App() {
                       {isIndustryReport && (
                         <div>
                           <div className="mb-3 text-[13px] font-medium text-[#4b5563]">Estimated output</div>
-                          <div className="rounded-2xl border border-[#e9d5ff] bg-[#faf7ff] px-5 py-4">
+                          <div className="rounded-2xl border border-[#d8b4fe] bg-[#faf7ff] px-5 py-4">
                             <div className="text-[16px] font-semibold text-[#2f2854]">10+ page industry report</div>
-                            <div className="mt-2 text-[13px] leading-6 text-[#6b7280]">
-                              Web and industry sources, about 15 minutes.
+                            <div className="mt-2">
+                              <span className="inline-flex rounded-full bg-[#f5f3ff] px-2.5 py-1 text-[11px] font-medium text-[#7e22ce]">
+                                15 minutes
+                              </span>
                             </div>
                           </div>
                         </div>
