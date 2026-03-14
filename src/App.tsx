@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Globe, PlusCircle, Home, Folder, Gift, Settings, ChevronDown, Paperclip, ArrowUp, Search, MoreHorizontal, Clock, BookOpen, FileText, Upload, Download, Plus, RotateCcw, Minus, X, Maximize2, ArrowDown, BarChart2, ArrowRight, Sparkles, Calendar, Star, Share2, CheckSquare, FolderPlus, Briefcase, GraduationCap, Layers, Check } from 'lucide-react';
+import { Globe, PlusCircle, Home, Folder, Gift, Settings, ChevronDown, ChevronUp, Paperclip, ArrowUp, Search, MoreHorizontal, Clock, BookOpen, FileText, Upload, Download, Plus, RotateCcw, Minus, X, Maximize2, ArrowDown, BarChart2, ArrowRight, Sparkles, Calendar, Star, Share2, CheckSquare, FolderPlus, Briefcase, GraduationCap, Layers, Check, Loader2 } from 'lucide-react';
 
 const Logo = () => (
   <div className="flex items-center">
@@ -31,6 +31,77 @@ export default function App() {
   const [isWriterDropdownOpen, setIsWriterDropdownOpen] = useState(false);
   const [isSearchScopeDropdownOpen, setIsSearchScopeDropdownOpen] = useState(false);
   const [searchScope, setSearchScope] = useState<'web' | 'paper'>('web');
+
+  // Research in-progress state
+  const [isResearchInProgress, setIsResearchInProgress] = useState(false);
+  const [researchPrompt, setResearchPrompt] = useState('');
+  const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({
+    'overview': true,
+    'math': false,
+    'physics': false,
+    'computing': false,
+    'communication': false,
+    'resources': false,
+    'projects': false,
+    'career': false,
+  });
+
+  type StepStatus = 'completed' | 'in_progress' | 'pending';
+
+  const researchSteps: { id: string; title: string; status: StepStatus; statusText?: string; content?: string; }[] = [
+    {
+      id: 'overview',
+      title: 'Overview & Core Concept Framework',
+      status: 'in_progress',
+      content: 'Quantum technology encompasses quantum computing, quantum communication, and quantum sensing. Core concepts include superposition, entanglement, quantum gates, qubits, and decoherence. This section establishes the foundational mental model for understanding how quantum mechanics principles translate into practical technological applications.',
+    },
+    {
+      id: 'math',
+      title: 'Mathematical Foundations & Prerequisites',
+      status: 'in_progress',
+      content: 'Key mathematical prerequisites include linear algebra (vector spaces, eigenvalues, tensor products), probability theory, complex analysis, and group theory. Familiarity with Dirac notation, density matrices, and Hilbert spaces is essential for formalizing quantum states and operations.',
+    },
+    {
+      id: 'physics',
+      title: 'Quantum Physics Fundamentals',
+      status: 'in_progress',
+      content: 'Covers wave-particle duality, Schrödinger equation, measurement postulates, uncertainty principle, spin systems, and multi-particle quantum mechanics. Emphasis on building physical intuition through thought experiments (double-slit, Stern-Gerlach) before moving into formalism.',
+    },
+    {
+      id: 'computing',
+      title: 'Quantum Computing Roadmap',
+      status: 'in_progress',
+      content: 'Circuit model: single-qubit & multi-qubit gates, universality, quantum parallelism. Key algorithms: Deutsch-Jozsa, Grover search, Shor factoring, VQE, QAOA. Error correction: stabilizer codes, surface codes, fault-tolerant thresholds. Hardware landscape: superconducting (IBM, Google), trapped-ion (IonQ, Quantinuum), photonic (Xanadu), neutral-atom (QuEra)...',
+    },
+    {
+      id: 'communication',
+      title: 'Quantum Communication Technology',
+      status: 'in_progress',
+      content: 'Quantum Key Distribution (QKD): BB84, E91, and decoy-state protocols. Quantum teleportation and entanglement swapping for long-distance communication. Quantum repeaters and quantum memory for extending network range. Satellite-based quantum communication (Micius). Post-quantum cryptography vs quantum-native security...',
+    },
+    {
+      id: 'resources',
+      title: 'Learning Resources & Platform Strategy',
+      status: 'in_progress',
+      content: 'Online courses: MIT OCW Quantum Physics, IBM Qiskit Textbook, Coursera/edX quantum specializations. Textbooks: Nielsen & Chuang, Preskill lecture notes, Wilde\'s Quantum Information Theory. Platforms: IBM Quantum Experience, Amazon Braket, Google Cirq, Xanadu PennyLane. Communities: Qiskit community, Quantum Open Source Foundation...',
+    },
+    {
+      id: 'projects',
+      title: 'Practical Projects & Skill Development',
+      status: 'in_progress',
+      content: 'Beginner: implement basic quantum circuits (Bell states, teleportation) on Qiskit. Intermediate: build a variational quantum eigensolver (VQE) for molecular simulation. Advanced: implement quantum error correction codes, contribute to open-source quantum libraries...',
+    },
+    {
+      id: 'career',
+      title: 'Career Development & Continuous Learning',
+      status: 'in_progress',
+      content: 'Career paths: quantum software engineer, quantum algorithm researcher, quantum hardware engineer, quantum application scientist. Industry demand growing in finance, pharma, logistics, cybersecurity. Key conferences: QIP, APS March Meeting, IEEE Quantum Week...',
+    },
+  ];
+
+  const toggleStep = (stepId: string) => {
+    setExpandedSteps(prev => ({ ...prev, [stepId]: !prev[stepId] }));
+  };
 
   // Tabs state
   const [openTabs, setOpenTabs] = useState<{ id: string, title: string, type: 'welcome' | 'pdf' | 'search' }[]>([
@@ -98,6 +169,9 @@ export default function App() {
       setIsReportSettingsModalOpen(true);
       return;
     }
+    setResearchPrompt(surveyPrompt);
+    setIsResearchInProgress(true);
+    setCurrentPage('project_workspace');
   };
 
   const handleCloseReportSettingsModal = () => {
@@ -107,6 +181,9 @@ export default function App() {
   const handleConfirmReportSettings = () => {
     if (!isReportSettingsComplete) return;
     setIsReportSettingsModalOpen(false);
+    setResearchPrompt(surveyPrompt);
+    setIsResearchInProgress(true);
+    setCurrentPage('project_workspace');
   };
 
   const handleReportTypeSelect = (value: string) => {
@@ -389,108 +466,235 @@ export default function App() {
 
         {/* Main Content Area */}
         <div className="flex-1 h-full flex p-4 gap-4 relative">
-          {/* Left Panel: Editor & Chat */}
+          {/* Left Panel */}
           <div className="flex-1 flex flex-col gap-4 z-10">
-            {/* Editor Area */}
-            <div className="flex-1 rounded-2xl bg-white/60 border border-white/80 shadow-[0_4px_20px_rgb(0,0,0,0.03)] backdrop-blur-xl p-6 flex flex-col">
-              <div className="font-semibold text-sm mb-4">Editor</div>
-              <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-                Select a project file, or start chatting with SciMaster!
-              </div>
-            </div>
 
-            {/* Chat Area */}
-            <div className="h-[320px] rounded-2xl bg-white/80 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-xl flex flex-col overflow-hidden">
-              <div className="h-12 border-b border-gray-100 flex items-center justify-between px-4">
-                <div className="flex items-center gap-2 font-bold text-sm">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 rounded-full bg-[#d8b4fe]"></div>
-                    <div className="w-2 h-2 rounded-full bg-[#c084fc]"></div>
-                  </div>
-                  SciMaster
-                </div>
-                <div className="flex items-center gap-3 text-gray-400">
-                  <button className="hover:text-gray-600"><Plus size={16} /></button>
-                  <button className="hover:text-gray-600"><RotateCcw size={16} /></button>
-                  <button className="hover:text-gray-600"><Minus size={16} /></button>
-                </div>
-              </div>
-              
-              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#f3e8ff] to-[#e0f2fe] flex items-center justify-center mb-4 shadow-inner">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 19L19 12L22 15L15 22L12 19Z" fill="white"/>
-                    <path d="M2 22L5 19L2 16L2 22Z" fill="white"/>
-                    <path d="M19 12L12 5L9 8L16 15L19 12Z" fill="white"/>
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">Hi, I am Writer</h2>
-                <p className="text-sm text-gray-400">Your dedicated partner for smarter, faster writing</p>
-              </div>
-
-              <div className="p-4 bg-white">
-                <div className="rounded-xl border border-gray-200 bg-white p-3 flex flex-col gap-3">
-                  <input 
-                    type="text" 
-                    placeholder="What do you want to write today?" 
-                    className="w-full bg-transparent border-none outline-none text-sm text-gray-800 placeholder:text-gray-400"
-                  />
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-xs font-medium text-gray-600">
-                      <div className="relative">
-                        <button 
-                          onClick={() => setIsWriterDropdownOpen(!isWriterDropdownOpen)}
-                          className="flex items-center gap-1 hover:text-gray-900"
-                        >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                          Writer <ChevronDown size={12} />
-                        </button>
-
-                        {isWriterDropdownOpen && (
-                          <div className="absolute bottom-full left-0 mb-3 w-[320px] bg-white rounded-xl shadow-[0_4px_24px_rgb(0,0,0,0.12)] border border-gray-100 p-2 flex flex-col gap-1 z-50">
-                            <button className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left">
-                              <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-600">
-                                <BookOpen size={16} />
-                              </div>
-                              <div>
-                                <div className="font-semibold text-gray-900 text-[15px] mb-0.5">Tutor</div>
-                                <div className="text-[13px] text-gray-500">From ideas to structured mindmap</div>
-                              </div>
-                            </button>
-                            
-                            <button className="flex items-start gap-3 p-3 rounded-lg bg-gray-100 transition-colors text-left">
-                              <div className="w-8 h-8 rounded-md bg-gray-200 flex items-center justify-center flex-shrink-0 text-gray-700">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                              </div>
-                              <div>
-                                <div className="font-semibold text-gray-900 text-[15px] mb-0.5">Writer</div>
-                                <div className="text-[13px] text-gray-500">Partner for smarter and faster writing</div>
-                              </div>
-                            </button>
-                            
-                            <button className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left">
-                              <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-600">
-                                <BarChart2 size={16} />
-                              </div>
-                              <div>
-                                <div className="font-semibold text-gray-900 text-[15px] mb-0.5">Analyzer</div>
-                                <div className="text-[13px] text-gray-500">Data analysis, calculation, visualization</div>
-                              </div>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <button className="flex items-center gap-1 hover:text-gray-900">
-                        claude-4.6 <ChevronDown size={12} />
-                      </button>
+            {isResearchInProgress ? (
+              /* Research In-Progress: SciMaster takes full left panel */
+              <div className="flex-1 rounded-2xl bg-white/80 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-xl flex flex-col overflow-hidden">
+                {/* Header */}
+                <div className="h-12 border-b border-gray-100 flex items-center justify-between px-4 flex-shrink-0">
+                  <div className="flex items-center gap-2 font-bold text-sm">
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 rounded-full bg-[#d8b4fe]"></div>
+                      <div className="w-2 h-2 rounded-full bg-[#c084fc]"></div>
                     </div>
-                    <button className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors">
+                    SciMaster
+                  </div>
+                  <div className="flex items-center gap-3 text-gray-400">
+                    <button className="hover:text-gray-600"><Plus size={16} /></button>
+                    <button className="hover:text-gray-600"><RotateCcw size={16} /></button>
+                    <button className="hover:text-gray-600"><Minus size={16} /></button>
+                  </div>
+                </div>
+
+                {/* Scrollable research content */}
+                <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5">
+                  {/* User message 1 */}
+                  <div className="flex justify-end">
+                    <div className="max-w-[75%] bg-[#f9fafb] border border-gray-200 rounded-2xl rounded-tr-md px-4 py-3 text-[14px] text-gray-800 leading-relaxed">
+                      Basics of quantum technology
+                    </div>
+                  </div>
+
+                  {/* AI follow-up question */}
+                  <div className="flex items-start gap-3">
+                    <img src="/sci图标.svg" alt="SciMaster" className="w-7 h-7 rounded-md flex-shrink-0 mt-0.5" />
+                    <div className="max-w-[80%] text-[14px] text-gray-800 leading-relaxed">
+                      <p>Which aspect of quantum technology would you like to explore — for example, quantum computing, quantum communication, or the fundamental principles of quantum physics?</p>
+                    </div>
+                  </div>
+
+                  {/* User message 2 */}
+                  <div className="flex justify-end">
+                    <div className="max-w-[75%] bg-[#f9fafb] border border-gray-200 rounded-2xl rounded-tr-md px-4 py-3 text-[14px] text-gray-800 leading-relaxed">
+                      All of them
+                    </div>
+                  </div>
+
+                  {/* Research Steps */}
+                  <div className="space-y-4">
+                    {researchSteps.map((step) => {
+                      const isExpanded = expandedSteps[step.id];
+                      const borderColor = step.status === 'completed'
+                        ? 'border-l-[#a78bfa]'
+                        : step.status === 'in_progress'
+                          ? 'border-l-[#f59e0b]'
+                          : 'border-l-gray-200';
+
+                      return (
+                        <div key={step.id} className={`border-l-[3px] ${borderColor} pl-4`}>
+                          {/* Step header */}
+                          <button
+                            onClick={() => toggleStep(step.id)}
+                            className="flex items-center gap-2 w-full text-left group"
+                          >
+                            <span className={`text-[15px] font-semibold ${
+                              step.status === 'pending' ? 'text-gray-400' : 'text-[#7c3aed]'
+                            }`}>
+                              {step.title}
+                            </span>
+                            {step.statusText && (
+                              <span className="text-[12px] text-gray-400 font-normal">{step.statusText}</span>
+                            )}
+                            {step.status === 'in_progress' && (
+                              <Loader2 size={14} className="text-[#f59e0b] animate-spin" />
+                            )}
+                            <span className="ml-auto text-gray-400 group-hover:text-gray-600 transition-colors">
+                              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </span>
+                          </button>
+
+                          {/* Step content (expanded) */}
+                          {isExpanded && step.status !== 'pending' && (
+                            <div className="mt-3">
+                              <div className="bg-white rounded-xl border border-gray-100 p-4">
+                                {step.content ? (
+                                  <p className="text-[13px] text-gray-700 leading-relaxed whitespace-pre-wrap">
+                                    {step.content}
+                                  </p>
+                                ) : (
+                                  <div className="flex items-center gap-2 text-[13px] text-gray-400">
+                                    <Loader2 size={14} className="animate-spin text-[#f59e0b]" />
+                                    Generating...
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Loading dots */}
+                  <div className="flex items-center gap-1.5 pl-4 pt-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#c084fc] animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#a78bfa] animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#d8b4fe] animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                </div>
+
+                {/* Bottom input (disabled during research) */}
+                <div className="p-4 bg-white border-t border-gray-100 flex-shrink-0">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 flex items-center gap-3 opacity-60">
+                    <input
+                      type="text"
+                      placeholder="Generating report... please wait"
+                      disabled
+                      className="w-full bg-transparent border-none outline-none text-sm text-gray-400 placeholder:text-gray-400 cursor-not-allowed"
+                    />
+                    <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
                       <ArrowUp size={14} className="text-white" strokeWidth={3} />
-                    </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              /* Default: Editor + Chat */
+              <>
+                {/* Editor Area */}
+                <div className="flex-1 rounded-2xl bg-white/60 border border-white/80 shadow-[0_4px_20px_rgb(0,0,0,0.03)] backdrop-blur-xl p-6 flex flex-col">
+                  <div className="font-semibold text-sm mb-4">Editor</div>
+                  <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+                    Select a project file, or start chatting with SciMaster!
+                  </div>
+                </div>
+
+                {/* Chat Area */}
+                <div className="h-[320px] rounded-2xl bg-white/80 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-xl flex flex-col overflow-hidden">
+                  <div className="h-12 border-b border-gray-100 flex items-center justify-between px-4">
+                    <div className="flex items-center gap-2 font-bold text-sm">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 rounded-full bg-[#d8b4fe]"></div>
+                        <div className="w-2 h-2 rounded-full bg-[#c084fc]"></div>
+                      </div>
+                      SciMaster
+                    </div>
+                    <div className="flex items-center gap-3 text-gray-400">
+                      <button className="hover:text-gray-600"><Plus size={16} /></button>
+                      <button className="hover:text-gray-600"><RotateCcw size={16} /></button>
+                      <button className="hover:text-gray-600"><Minus size={16} /></button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#f3e8ff] to-[#e0f2fe] flex items-center justify-center mb-4 shadow-inner">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 19L19 12L22 15L15 22L12 19Z" fill="white"/>
+                        <path d="M2 22L5 19L2 16L2 22Z" fill="white"/>
+                        <path d="M19 12L12 5L9 8L16 15L19 12Z" fill="white"/>
+                      </svg>
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">Hi, I am Writer</h2>
+                    <p className="text-sm text-gray-400">Your dedicated partner for smarter, faster writing</p>
+                  </div>
+
+                  <div className="p-4 bg-white">
+                    <div className="rounded-xl border border-gray-200 bg-white p-3 flex flex-col gap-3">
+                      <input 
+                        type="text" 
+                        placeholder="What do you want to write today?" 
+                        className="w-full bg-transparent border-none outline-none text-sm text-gray-800 placeholder:text-gray-400"
+                      />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 text-xs font-medium text-gray-600">
+                          <div className="relative">
+                            <button 
+                              onClick={() => setIsWriterDropdownOpen(!isWriterDropdownOpen)}
+                              className="flex items-center gap-1 hover:text-gray-900"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                              Writer <ChevronDown size={12} />
+                            </button>
+
+                            {isWriterDropdownOpen && (
+                              <div className="absolute bottom-full left-0 mb-3 w-[320px] bg-white rounded-xl shadow-[0_4px_24px_rgb(0,0,0,0.12)] border border-gray-100 p-2 flex flex-col gap-1 z-50">
+                                <button className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left">
+                                  <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-600">
+                                    <BookOpen size={16} />
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold text-gray-900 text-[15px] mb-0.5">Tutor</div>
+                                    <div className="text-[13px] text-gray-500">From ideas to structured mindmap</div>
+                                  </div>
+                                </button>
+                                
+                                <button className="flex items-start gap-3 p-3 rounded-lg bg-gray-100 transition-colors text-left">
+                                  <div className="w-8 h-8 rounded-md bg-gray-200 flex items-center justify-center flex-shrink-0 text-gray-700">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold text-gray-900 text-[15px] mb-0.5">Writer</div>
+                                    <div className="text-[13px] text-gray-500">Partner for smarter and faster writing</div>
+                                  </div>
+                                </button>
+                                
+                                <button className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left">
+                                  <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-600">
+                                    <BarChart2 size={16} />
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold text-gray-900 text-[15px] mb-0.5">Analyzer</div>
+                                    <div className="text-[13px] text-gray-500">Data analysis, calculation, visualization</div>
+                                  </div>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <button className="flex items-center gap-1 hover:text-gray-900">
+                            claude-4.6 <ChevronDown size={12} />
+                          </button>
+                        </div>
+                        <button className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors">
+                          <ArrowUp size={14} className="text-white" strokeWidth={3} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Right Panel: Document View */}
