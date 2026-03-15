@@ -22,7 +22,7 @@ const LogoSmall = () => (
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'all_projects' | 'project_workspace'>('home');
-  const [selectedAction, setSelectedAction] = useState('Research Reports');
+  const [selectedAction, setSelectedAction] = useState<'idea_brainstorming' | 'deep_survey' | null>(null);
   const [surveyPrompt, setSurveyPrompt] = useState('');
   const [isOutputSettingsOpen, setIsOutputSettingsOpen] = useState(false);
   const [isReportSettingsModalOpen, setIsReportSettingsModalOpen] = useState(false);
@@ -35,6 +35,11 @@ export default function App() {
   // Research in-progress state
   const [isResearchInProgress, setIsResearchInProgress] = useState(false);
   const [researchPrompt, setResearchPrompt] = useState('');
+  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({
+    'thinking': true,
+    'writing': true,
+    'polishing': false,
+  });
   const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({
     'overview': true,
     'math': false,
@@ -46,58 +51,87 @@ export default function App() {
     'career': false,
   });
 
+  type PhaseStatus = 'completed' | 'in_progress' | 'pending';
   type StepStatus = 'completed' | 'in_progress' | 'pending';
 
-  const researchSteps: { id: string; title: string; status: StepStatus; statusText?: string; content?: string; }[] = [
+  const researchPhases: {
+    id: string;
+    title: string;
+    status: PhaseStatus;
+    streamContent?: string;
+    sections?: { id: string; title: string; status: StepStatus; content?: string }[];
+  }[] = [
     {
-      id: 'overview',
-      title: 'Overview & Core Concept Framework',
-      status: 'in_progress',
-      content: 'Quantum technology encompasses quantum computing, quantum communication, and quantum sensing. Core concepts include superposition, entanglement, quantum gates, qubits, and decoherence. This section establishes the foundational mental model for understanding how quantum mechanics principles translate into practical technological applications.',
+      id: 'thinking',
+      title: 'Thinking',
+      status: 'completed',
+      streamContent: 'Analyzing the topic "Basics of quantum technology"...\n\nIdentified 8 key areas to cover: core concepts, mathematical foundations, quantum physics, computing roadmap, communication technology, learning resources, practical projects, and career development.\n\nPlanning report structure with comprehensive coverage across theoretical foundations and practical applications. Cross-referencing 47 academic sources and 12 industry reports...\n\nOutline finalized. Proceeding to parallel writing phase.',
     },
     {
-      id: 'math',
-      title: 'Mathematical Foundations & Prerequisites',
+      id: 'writing',
+      title: 'Writing',
       status: 'in_progress',
-      content: 'Key mathematical prerequisites include linear algebra (vector spaces, eigenvalues, tensor products), probability theory, complex analysis, and group theory. Familiarity with Dirac notation, density matrices, and Hilbert spaces is essential for formalizing quantum states and operations.',
+      sections: [
+        {
+          id: 'overview',
+          title: 'Overview & Core Concept Framework',
+          status: 'in_progress',
+          content: 'Quantum technology encompasses quantum computing, quantum communication, and quantum sensing. Core concepts include superposition, entanglement, quantum gates, qubits, and decoherence. This section establishes the foundational mental model for understanding how quantum mechanics principles translate into practical technological applications.',
+        },
+        {
+          id: 'math',
+          title: 'Mathematical Foundations & Prerequisites',
+          status: 'in_progress',
+          content: 'Key mathematical prerequisites include linear algebra (vector spaces, eigenvalues, tensor products), probability theory, complex analysis, and group theory. Familiarity with Dirac notation, density matrices, and Hilbert spaces is essential for formalizing quantum states and operations.',
+        },
+        {
+          id: 'physics',
+          title: 'Quantum Physics Fundamentals',
+          status: 'in_progress',
+          content: 'Covers wave-particle duality, Schrödinger equation, measurement postulates, uncertainty principle, spin systems, and multi-particle quantum mechanics. Emphasis on building physical intuition through thought experiments (double-slit, Stern-Gerlach) before moving into formalism.',
+        },
+        {
+          id: 'computing',
+          title: 'Quantum Computing Roadmap',
+          status: 'in_progress',
+          content: 'Circuit model: single-qubit & multi-qubit gates, universality, quantum parallelism. Key algorithms: Deutsch-Jozsa, Grover search, Shor factoring, VQE, QAOA. Error correction: stabilizer codes, surface codes, fault-tolerant thresholds. Hardware landscape: superconducting (IBM, Google), trapped-ion (IonQ, Quantinuum), photonic (Xanadu), neutral-atom (QuEra)...',
+        },
+        {
+          id: 'communication',
+          title: 'Quantum Communication Technology',
+          status: 'in_progress',
+          content: 'Quantum Key Distribution (QKD): BB84, E91, and decoy-state protocols. Quantum teleportation and entanglement swapping for long-distance communication. Quantum repeaters and quantum memory for extending network range. Satellite-based quantum communication (Micius). Post-quantum cryptography vs quantum-native security...',
+        },
+        {
+          id: 'resources',
+          title: 'Learning Resources & Platform Strategy',
+          status: 'in_progress',
+          content: 'Online courses: MIT OCW Quantum Physics, IBM Qiskit Textbook, Coursera/edX quantum specializations. Textbooks: Nielsen & Chuang, Preskill lecture notes, Wilde\'s Quantum Information Theory. Platforms: IBM Quantum Experience, Amazon Braket, Google Cirq, Xanadu PennyLane. Communities: Qiskit community, Quantum Open Source Foundation...',
+        },
+        {
+          id: 'projects',
+          title: 'Practical Projects & Skill Development',
+          status: 'in_progress',
+          content: 'Beginner: implement basic quantum circuits (Bell states, teleportation) on Qiskit. Intermediate: build a variational quantum eigensolver (VQE) for molecular simulation. Advanced: implement quantum error correction codes, contribute to open-source quantum libraries...',
+        },
+        {
+          id: 'career',
+          title: 'Career Development & Continuous Learning',
+          status: 'in_progress',
+          content: 'Career paths: quantum software engineer, quantum algorithm researcher, quantum hardware engineer, quantum application scientist. Industry demand growing in finance, pharma, logistics, cybersecurity. Key conferences: QIP, APS March Meeting, IEEE Quantum Week...',
+        },
+      ],
     },
     {
-      id: 'physics',
-      title: 'Quantum Physics Fundamentals',
-      status: 'in_progress',
-      content: 'Covers wave-particle duality, Schrödinger equation, measurement postulates, uncertainty principle, spin systems, and multi-particle quantum mechanics. Emphasis on building physical intuition through thought experiments (double-slit, Stern-Gerlach) before moving into formalism.',
-    },
-    {
-      id: 'computing',
-      title: 'Quantum Computing Roadmap',
-      status: 'in_progress',
-      content: 'Circuit model: single-qubit & multi-qubit gates, universality, quantum parallelism. Key algorithms: Deutsch-Jozsa, Grover search, Shor factoring, VQE, QAOA. Error correction: stabilizer codes, surface codes, fault-tolerant thresholds. Hardware landscape: superconducting (IBM, Google), trapped-ion (IonQ, Quantinuum), photonic (Xanadu), neutral-atom (QuEra)...',
-    },
-    {
-      id: 'communication',
-      title: 'Quantum Communication Technology',
-      status: 'in_progress',
-      content: 'Quantum Key Distribution (QKD): BB84, E91, and decoy-state protocols. Quantum teleportation and entanglement swapping for long-distance communication. Quantum repeaters and quantum memory for extending network range. Satellite-based quantum communication (Micius). Post-quantum cryptography vs quantum-native security...',
-    },
-    {
-      id: 'resources',
-      title: 'Learning Resources & Platform Strategy',
-      status: 'in_progress',
-      content: 'Online courses: MIT OCW Quantum Physics, IBM Qiskit Textbook, Coursera/edX quantum specializations. Textbooks: Nielsen & Chuang, Preskill lecture notes, Wilde\'s Quantum Information Theory. Platforms: IBM Quantum Experience, Amazon Braket, Google Cirq, Xanadu PennyLane. Communities: Qiskit community, Quantum Open Source Foundation...',
-    },
-    {
-      id: 'projects',
-      title: 'Practical Projects & Skill Development',
-      status: 'in_progress',
-      content: 'Beginner: implement basic quantum circuits (Bell states, teleportation) on Qiskit. Intermediate: build a variational quantum eigensolver (VQE) for molecular simulation. Advanced: implement quantum error correction codes, contribute to open-source quantum libraries...',
-    },
-    {
-      id: 'career',
-      title: 'Career Development & Continuous Learning',
-      status: 'in_progress',
-      content: 'Career paths: quantum software engineer, quantum algorithm researcher, quantum hardware engineer, quantum application scientist. Industry demand growing in finance, pharma, logistics, cybersecurity. Key conferences: QIP, APS March Meeting, IEEE Quantum Week...',
+      id: 'polishing',
+      title: 'Polishing',
+      status: 'pending',
     },
   ];
+
+  const togglePhase = (phaseId: string) => {
+    setExpandedPhases(prev => ({ ...prev, [phaseId]: !prev[phaseId] }));
+  };
 
   const toggleStep = (stepId: string) => {
     setExpandedSteps(prev => ({ ...prev, [stepId]: !prev[stepId] }));
@@ -123,8 +157,8 @@ export default function App() {
       description: 'Literature-based overview of academic papers, methods, and research trends.'
     },
     {
-      value: 'Industry Report',
-      label: 'Industry Report',
+      value: 'Deep Research',
+      label: 'Deep Research',
       description: 'Insights from web and industry sources, including markets, companies, and emerging signals.'
     }
   ];
@@ -147,7 +181,7 @@ export default function App() {
   const selectedReportType = reportTypeOptions.find((option) => option.value === reportType);
   const selectedReportLength = reportLengthOptions.find((option) => option.value === reportLength);
   const isAcademicSurvey = reportType === 'Academic Survey';
-  const isIndustryReport = reportType === 'Industry Report';
+  const isIndustryReport = reportType === 'Deep Research';
   const canAttemptSurvey = surveyPrompt.trim() !== '';
   const isReportSettingsComplete = reportType !== '' && (isIndustryReport || reportLength !== '');
   const canSubmitSurvey = isReportSettingsComplete && surveyPrompt.trim() !== '';
@@ -164,14 +198,19 @@ export default function App() {
 
   const handleSurveySubmit = () => {
     if (!canAttemptSurvey) return;
-    if (!isReportSettingsComplete) {
-      setIsOutputSettingsOpen(false);
-      setIsReportSettingsModalOpen(true);
-      return;
+    if (selectedAction === 'deep_survey') {
+      if (!isReportSettingsComplete) {
+        setIsOutputSettingsOpen(false);
+        setIsReportSettingsModalOpen(true);
+        return;
+      }
+      setResearchPrompt(surveyPrompt);
+      setIsResearchInProgress(true);
+      setCurrentPage('project_workspace');
+    } else {
+      setResearchPrompt(surveyPrompt);
+      setCurrentPage('project_workspace');
     }
-    setResearchPrompt(surveyPrompt);
-    setIsResearchInProgress(true);
-    setCurrentPage('project_workspace');
   };
 
   const handleCloseReportSettingsModal = () => {
@@ -188,7 +227,7 @@ export default function App() {
 
   const handleReportTypeSelect = (value: string) => {
     setReportType(value);
-    if (value === 'Industry Report') {
+    if (value === 'Deep Research') {
       setReportLength('');
     }
   };
@@ -512,54 +551,119 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Research Steps */}
-                  <div className="space-y-4">
-                    {researchSteps.map((step) => {
-                      const isExpanded = expandedSteps[step.id];
-                      const borderColor = step.status === 'completed'
-                        ? 'border-l-[#a78bfa]'
-                        : step.status === 'in_progress'
-                          ? 'border-l-[#f59e0b]'
-                          : 'border-l-gray-200';
+                  {/* Research Phases: Thinking → Writing → Polishing */}
+                  <div className="space-y-6">
+                    {researchPhases.map((phase, phaseIndex) => {
+                      const isPhaseExpanded = expandedPhases[phase.id];
+                      const phaseIcon = phase.status === 'completed'
+                        ? <Check size={14} className="text-white" strokeWidth={3} />
+                        : phase.status === 'in_progress'
+                          ? <Loader2 size={14} className="text-white animate-spin" />
+                          : <span className="text-[10px] text-white font-bold">{phaseIndex + 1}</span>;
+                      const phaseBg = phase.status === 'completed'
+                        ? 'bg-[#a78bfa]'
+                        : phase.status === 'in_progress'
+                          ? 'bg-[#f59e0b]'
+                          : 'bg-gray-300';
+                      const phaseTextColor = phase.status === 'pending' ? 'text-gray-400' : 'text-[#1e1b4b]';
 
                       return (
-                        <div key={step.id} className={`border-l-[3px] ${borderColor} pl-4`}>
-                          {/* Step header */}
+                        <div key={phase.id}>
+                          {/* Phase header */}
                           <button
-                            onClick={() => toggleStep(step.id)}
-                            className="flex items-center gap-2 w-full text-left group"
+                            onClick={() => togglePhase(phase.id)}
+                            className="flex items-center gap-3 w-full text-left group mb-3"
                           >
-                            <span className={`text-[15px] font-semibold ${
-                              step.status === 'pending' ? 'text-gray-400' : 'text-[#7c3aed]'
-                            }`}>
-                              {step.title}
+                            <div className={`w-6 h-6 rounded-full ${phaseBg} flex items-center justify-center flex-shrink-0`}>
+                              {phaseIcon}
+                            </div>
+                            <span className={`text-[16px] font-bold ${phaseTextColor} tracking-wide`}>
+                              {phase.title}
                             </span>
-                            {step.statusText && (
-                              <span className="text-[12px] text-gray-400 font-normal">{step.statusText}</span>
+                            {phase.status === 'in_progress' && (
+                              <span className="text-[11px] text-[#f59e0b] font-medium bg-[#fef3c7] px-2 py-0.5 rounded-full">In progress</span>
                             )}
-                            {step.status === 'in_progress' && (
-                              <Loader2 size={14} className="text-[#f59e0b] animate-spin" />
+                            {phase.status === 'completed' && (
+                              <span className="text-[11px] text-[#7c3aed] font-medium bg-[#f3e8ff] px-2 py-0.5 rounded-full">Done</span>
                             )}
                             <span className="ml-auto text-gray-400 group-hover:text-gray-600 transition-colors">
-                              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              {isPhaseExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                             </span>
                           </button>
 
-                          {/* Step content (expanded) */}
-                          {isExpanded && step.status !== 'pending' && (
-                            <div className="mt-3">
-                              <div className="bg-white rounded-xl border border-gray-100 p-4">
-                                {step.content ? (
+                          {/* Phase content */}
+                          {isPhaseExpanded && phase.status !== 'pending' && (
+                            <div className="ml-3 border-l-2 border-gray-100 pl-6">
+                              {/* Thinking / Polishing: stream content */}
+                              {phase.streamContent && (
+                                <div className="bg-[#faf7ff] rounded-xl border border-[#e9d5ff] p-4 mb-3">
                                   <p className="text-[13px] text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                    {step.content}
+                                    {phase.streamContent}
                                   </p>
-                                ) : (
-                                  <div className="flex items-center gap-2 text-[13px] text-gray-400">
-                                    <Loader2 size={14} className="animate-spin text-[#f59e0b]" />
-                                    Generating...
-                                  </div>
-                                )}
-                              </div>
+                                  {phase.status === 'in_progress' && (
+                                    <span className="inline-block w-[6px] h-[16px] bg-[#7c3aed] animate-pulse ml-0.5 align-middle rounded-sm" />
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Writing: parallel sections */}
+                              {phase.sections && (
+                                <div className="space-y-3">
+                                  {phase.sections.map((step) => {
+                                    const isExpanded = expandedSteps[step.id];
+                                    const borderColor = step.status === 'completed'
+                                      ? 'border-l-[#a78bfa]'
+                                      : step.status === 'in_progress'
+                                        ? 'border-l-[#f59e0b]'
+                                        : 'border-l-gray-200';
+
+                                    return (
+                                      <div key={step.id} className={`border-l-[3px] ${borderColor} pl-4`}>
+                                        <button
+                                          onClick={() => toggleStep(step.id)}
+                                          className="flex items-center gap-2 w-full text-left group"
+                                        >
+                                          <span className={`text-[14px] font-semibold ${
+                                            step.status === 'pending' ? 'text-gray-400' : 'text-[#7c3aed]'
+                                          }`}>
+                                            {step.title}
+                                          </span>
+                                          {step.status === 'in_progress' && (
+                                            <Loader2 size={13} className="text-[#f59e0b] animate-spin" />
+                                          )}
+                                          <span className="ml-auto text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                          </span>
+                                        </button>
+
+                                        {isExpanded && step.status !== 'pending' && (
+                                          <div className="mt-2">
+                                            <div className="bg-white rounded-xl border border-gray-100 p-4">
+                                              {step.content ? (
+                                                <p className="text-[13px] text-gray-700 leading-relaxed whitespace-pre-wrap">
+                                                  {step.content}
+                                                </p>
+                                              ) : (
+                                                <div className="flex items-center gap-2 text-[13px] text-gray-400">
+                                                  <Loader2 size={14} className="animate-spin text-[#f59e0b]" />
+                                                  Generating...
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Pending phase placeholder */}
+                          {phase.status === 'pending' && (
+                            <div className="ml-3 border-l-2 border-dashed border-gray-200 pl-6 py-2">
+                              <span className="text-[12px] text-gray-400 italic">Waiting for previous phase to complete...</span>
                             </div>
                           )}
                         </div>
@@ -568,11 +672,13 @@ export default function App() {
                   </div>
 
                   {/* Loading dots */}
-                  <div className="flex items-center gap-1.5 pl-4 pt-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#c084fc] animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#a78bfa] animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#d8b4fe] animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                  </div>
+                  {researchPhases.some(p => p.status === 'in_progress') && (
+                    <div className="flex items-center gap-1.5 pl-4 pt-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#c084fc] animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#a78bfa] animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#d8b4fe] animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Bottom input (disabled during research) */}
@@ -1155,24 +1261,58 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Composer Card */}
-              <div className="mt-12 w-full max-w-[800px] min-h-[240px] rounded-2xl bg-white/90 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-xl p-8 flex flex-col transition-all">
-                {selectedAction === 'Research Reports' ? (
+              {/* Two Feature Cards */}
+              <div className="mt-10 w-full max-w-[800px] grid grid-cols-2 gap-4">
+                {/* Idea Brainstorming Card */}
+                <button
+                  onClick={() => setSelectedAction(selectedAction === 'idea_brainstorming' ? null : 'idea_brainstorming')}
+                  className={`text-left rounded-2xl border p-6 transition-all hover:shadow-md ${
+                    selectedAction === 'idea_brainstorming'
+                      ? 'border-[#c084fc] bg-[#faf5ff] shadow-[0_4px_16px_rgba(139,92,246,0.12)]'
+                      : 'border-gray-200/80 bg-white/90 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-[28px]">💡</span>
+                    <h3 className="text-[18px] font-bold text-[#1e1b4b]">Idea Brainstorming</h3>
+                  </div>
+                  <p className="text-[13px] text-gray-500 leading-relaxed">
+                    Iterate on concepts, build structures, and find novel angles.
+                  </p>
+                </button>
+
+                {/* Synthesize Draft Card */}
+                <button
+                  onClick={() => setSelectedAction(selectedAction === 'deep_survey' ? null : 'deep_survey')}
+                  className={`text-left rounded-2xl border p-6 transition-all hover:shadow-md ${
+                    selectedAction === 'deep_survey'
+                      ? 'border-[#c084fc] bg-[#faf5ff] shadow-[0_4px_16px_rgba(139,92,246,0.12)]'
+                      : 'border-gray-200/80 bg-white/90 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-[28px]">🔍</span>
+                    <h3 className="text-[18px] font-bold text-[#1e1b4b]">Synthesize Draft</h3>
+                  </div>
+                  <p className="text-[13px] text-gray-500 leading-relaxed">
+                    Synthesize literature reviews or generate instant, data-rich survey reports from your sources.
+                  </p>
+                </button>
+              </div>
+
+              {/* Unified Input Box */}
+              <div className="mt-5 w-full max-w-[800px] rounded-2xl bg-white/90 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-xl p-5 flex flex-col transition-all">
+                {selectedAction === 'deep_survey' ? (
                   <>
-                    <h2 className="text-[17px] font-semibold text-[#8b5cf6] mb-4">
-                      Research Reports
-                    </h2>
-                    
                     <div className="flex-1 flex flex-col">
                       <textarea 
                         value={surveyPrompt}
                         onChange={(e) => setSurveyPrompt(e.target.value)}
                         placeholder={surveyPlaceholder}
-                        className="w-full flex-1 bg-transparent border-none outline-none text-[15px] text-gray-800 placeholder:text-gray-400 resize-none min-h-[80px]"
+                        className="w-full flex-1 bg-transparent border-none outline-none text-[15px] text-gray-800 placeholder:text-gray-400 resize-none min-h-[56px]"
                       />
                     </div>
-
-                    <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
                       <div className="flex items-center gap-4 text-sm text-gray-600 relative">
                         <div className="relative" ref={outputSettingsRef}>
                           <button 
@@ -1185,7 +1325,6 @@ export default function App() {
                               : 'Type'}
                           </button>
                           
-                          {/* Settings Popover */}
                           {isOutputSettingsOpen && (
                             <div className="absolute bottom-full left-0 mb-2 w-[420px] max-w-[calc(100vw-64px)] bg-white rounded-2xl shadow-[0_12px_36px_rgb(0,0,0,0.12)] border border-gray-100 p-4 z-50">
                               <div className="flex items-center justify-between mb-2.5">
@@ -1294,7 +1433,7 @@ export default function App() {
                                       <label className="text-xs font-medium text-gray-700">Estimated output</label>
                                     </div>
                                     <div className="rounded-xl border border-[#d8b4fe] bg-[#faf7ff] px-4 py-3">
-                                      <div className="text-[13px] font-semibold text-[#2f2854]">Industry Report</div>
+                                      <div className="text-[13px] font-semibold text-[#2f2854]">Deep Research</div>
                                       <div className="mt-2">
                                         <span className="inline-flex rounded-full bg-[#f5f3ff] px-2.5 py-1 text-[11px] font-medium text-[#7e22ce]">
                                           15 minutes
@@ -1327,14 +1466,13 @@ export default function App() {
                   </>
                 ) : (
                   <>
-                    <h2 className="text-[17px] font-semibold text-[#8b5cf6] mb-4">{selectedAction}</h2>
-                    <div className="flex-1">
-                      <textarea 
-                        placeholder="What would you like to explore today?"
-                        className="w-full h-full bg-transparent border-none outline-none text-[15px] text-gray-800 placeholder:text-gray-500 resize-none"
-                      />
-                    </div>
-                    <div className="mt-8 flex items-center justify-between">
+                    <textarea 
+                      value={surveyPrompt}
+                      onChange={(e) => setSurveyPrompt(e.target.value)}
+                      placeholder="Ask or refine your topic..."
+                      className="w-full bg-transparent border-none outline-none text-[15px] text-gray-800 placeholder:text-gray-400 resize-none min-h-[56px]"
+                    />
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
                       <div className="flex items-center gap-6 text-sm text-gray-600">
                         <button className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
                           Editor style <ChevronDown size={14} className="text-gray-400" />
@@ -1349,31 +1487,21 @@ export default function App() {
                           <Paperclip size={14} className="text-gray-400" /> Knowledge files
                         </button>
                       </div>
-                      <button className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#dbeafe] to-[#e9d5ff] flex items-center justify-center hover:opacity-90 transition-opacity shadow-sm">
-                        <ArrowUp size={18} className="text-white" strokeWidth={2} />
+                      <button
+                        onClick={handleSurveySubmit}
+                        disabled={!canAttemptSurvey}
+                        className={`h-10 px-5 rounded-full flex items-center justify-center gap-2 transition-all shadow-sm flex-shrink-0 text-[13px] font-semibold ${
+                          canAttemptSurvey
+                            ? 'bg-gradient-to-tr from-[#dbeafe] to-[#e9d5ff] text-white hover:opacity-90'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-70'
+                        }`}
+                      >
+                        Manuscript Writing
+                        <ArrowUp size={15} className={canAttemptSurvey ? 'text-white' : 'text-gray-400'} strokeWidth={2.5} />
                       </button>
                     </div>
                   </>
                 )}
-              </div>
-
-              {/* Quick Actions */}
-              <div className="mt-6 flex items-center justify-center max-w-[800px] w-full">
-                <div className="flex items-center p-1.5 rounded-full bg-white/60 backdrop-blur-md shadow-sm border border-white/40">
-                  {['Paper search', 'Idea brainstorming', 'Data analysis', 'Research Reports', 'Manuscript drafting'].map((action) => (
-                    <button 
-                      key={action} 
-                      onClick={() => setSelectedAction(action)}
-                      className={`px-5 py-2.5 rounded-full text-[14px] font-medium transition-all ${
-                        selectedAction === action 
-                          ? 'bg-white text-gray-900 shadow-[0_2px_10px_rgb(0,0,0,0.06)]' 
-                          : 'text-gray-700 hover:text-gray-900 hover:bg-white/50'
-                      }`}
-                    >
-                      {action}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* Recent Projects */}
@@ -1493,7 +1621,7 @@ export default function App() {
                         <div>
                           <div className="mb-3 text-[13px] font-medium text-[#4b5563]">Estimated output</div>
                           <div className="rounded-2xl border border-[#d8b4fe] bg-[#faf7ff] px-5 py-4">
-                            <div className="text-[16px] font-semibold text-[#2f2854]">10+ page industry report</div>
+                            <div className="text-[16px] font-semibold text-[#2f2854]">10+ page deep research</div>
                             <div className="mt-2">
                               <span className="inline-flex rounded-full bg-[#f5f3ff] px-2.5 py-1 text-[11px] font-medium text-[#7e22ce]">
                                 15 minutes
