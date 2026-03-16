@@ -1,1694 +1,186 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Globe, PlusCircle, Home, Folder, Gift, Settings, ChevronDown, ChevronUp, Paperclip, ArrowUp, Search, MoreHorizontal, Clock, BookOpen, FileText, Upload, Download, Plus, RotateCcw, Minus, X, Maximize2, ArrowDown, BarChart2, ArrowRight, Sparkles, Calendar, Star, Share2, CheckSquare, FolderPlus, Briefcase, GraduationCap, Layers, Check, Loader2 } from 'lucide-react';
-
-const Logo = () => (
-  <div className="flex items-center">
-    <img src="/scimaster_logo.svg" alt="SciMaster" className="h-6" />
-  </div>
-);
-
-const LogoSmall = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2L3 7V17L12 22L21 17V7L12 2Z" fill="#1F2937"/>
-    <circle cx="12" cy="12" r="4" fill="url(#paint0_linear_small)"/>
-    <defs>
-      <linearGradient id="paint0_linear_small" x1="8" y1="8" x2="16" y2="16" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#34D399" />
-        <stop offset="1" stopColor="#FBBF24" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
+import { useState } from 'react';
+import type { PageId, ActionId, Tab, ChatMessage } from './types';
+import { useResearchProgress } from './hooks/useResearchProgress';
+import { HomePage } from './components/HomePage';
+import { WorkspaceSidebar } from './components/WorkspaceSidebar';
+import { ResearchPanel } from './components/ResearchPanel';
+import { DefaultChatPanel } from './components/DefaultChatPanel';
+import { DocumentViewer } from './components/DocumentViewer';
+import { ReportSettingsModal } from './components/ReportSettingsModal';
+import { NotificationPrompt } from './components/NotificationPrompt';
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<'home' | 'all_projects' | 'project_workspace'>('home');
-  const [selectedAction, setSelectedAction] = useState<'idea_brainstorming' | 'deep_survey' | null>(null);
-  const [surveyPrompt, setSurveyPrompt] = useState('');
-  const [isOutputSettingsOpen, setIsOutputSettingsOpen] = useState(false);
-  const [isReportSettingsModalOpen, setIsReportSettingsModalOpen] = useState(false);
+  // Navigation
+  const [currentPage, setCurrentPage] = useState<PageId>('home');
+  const [selectedAction, setSelectedAction] = useState<ActionId>(null);
+
+  // Report settings
   const [reportType, setReportType] = useState('');
   const [reportLength, setReportLength] = useState('');
-  const [isWriterDropdownOpen, setIsWriterDropdownOpen] = useState(false);
-  const [isSearchScopeDropdownOpen, setIsSearchScopeDropdownOpen] = useState(false);
-  const [searchScope, setSearchScope] = useState<'web' | 'paper'>('web');
+  const [isReportSettingsModalOpen, setIsReportSettingsModalOpen] = useState(false);
 
-  // Research in-progress state
+  // Research state
   const [isResearchInProgress, setIsResearchInProgress] = useState(false);
   const [researchPrompt, setResearchPrompt] = useState('');
-  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({
-    'thinking': true,
-    'writing': true,
-    'polishing': false,
-  });
-  const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({
-    'overview': true,
-    'math': false,
-    'physics': false,
-    'computing': false,
-    'communication': false,
-    'resources': false,
-    'projects': false,
-    'career': false,
-  });
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [initialInput, setInitialInput] = useState('');
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
-  type PhaseStatus = 'completed' | 'in_progress' | 'pending';
-  type StepStatus = 'completed' | 'in_progress' | 'pending';
+  // Tabs
+  const [openTabs, setOpenTabs] = useState<Tab[]>([{ id: 'welcome', title: 'Welcome_...', type: 'welcome' }]);
+  const [activeTabId, setActiveTabId] = useState('welcome');
 
-  const researchPhases: {
-    id: string;
-    title: string;
-    status: PhaseStatus;
-    streamContent?: string;
-    sections?: { id: string; title: string; status: StepStatus; content?: string }[];
-  }[] = [
-    {
-      id: 'thinking',
-      title: 'Thinking',
-      status: 'completed',
-      streamContent: 'Analyzing the topic "Basics of quantum technology"...\n\nIdentified 8 key areas to cover: core concepts, mathematical foundations, quantum physics, computing roadmap, communication technology, learning resources, practical projects, and career development.\n\nPlanning report structure with comprehensive coverage across theoretical foundations and practical applications. Cross-referencing 47 academic sources and 12 industry reports...\n\nOutline finalized. Proceeding to parallel writing phase.',
-    },
-    {
-      id: 'writing',
-      title: 'Writing',
-      status: 'in_progress',
-      sections: [
-        {
-          id: 'overview',
-          title: 'Overview & Core Concept Framework',
-          status: 'in_progress',
-          content: 'Quantum technology encompasses quantum computing, quantum communication, and quantum sensing. Core concepts include superposition, entanglement, quantum gates, qubits, and decoherence. This section establishes the foundational mental model for understanding how quantum mechanics principles translate into practical technological applications.',
-        },
-        {
-          id: 'math',
-          title: 'Mathematical Foundations & Prerequisites',
-          status: 'in_progress',
-          content: 'Key mathematical prerequisites include linear algebra (vector spaces, eigenvalues, tensor products), probability theory, complex analysis, and group theory. Familiarity with Dirac notation, density matrices, and Hilbert spaces is essential for formalizing quantum states and operations.',
-        },
-        {
-          id: 'physics',
-          title: 'Quantum Physics Fundamentals',
-          status: 'in_progress',
-          content: 'Covers wave-particle duality, Schrödinger equation, measurement postulates, uncertainty principle, spin systems, and multi-particle quantum mechanics. Emphasis on building physical intuition through thought experiments (double-slit, Stern-Gerlach) before moving into formalism.',
-        },
-        {
-          id: 'computing',
-          title: 'Quantum Computing Roadmap',
-          status: 'in_progress',
-          content: 'Circuit model: single-qubit & multi-qubit gates, universality, quantum parallelism. Key algorithms: Deutsch-Jozsa, Grover search, Shor factoring, VQE, QAOA. Error correction: stabilizer codes, surface codes, fault-tolerant thresholds. Hardware landscape: superconducting (IBM, Google), trapped-ion (IonQ, Quantinuum), photonic (Xanadu), neutral-atom (QuEra)...',
-        },
-        {
-          id: 'communication',
-          title: 'Quantum Communication Technology',
-          status: 'in_progress',
-          content: 'Quantum Key Distribution (QKD): BB84, E91, and decoy-state protocols. Quantum teleportation and entanglement swapping for long-distance communication. Quantum repeaters and quantum memory for extending network range. Satellite-based quantum communication (Micius). Post-quantum cryptography vs quantum-native security...',
-        },
-        {
-          id: 'resources',
-          title: 'Learning Resources & Platform Strategy',
-          status: 'in_progress',
-          content: 'Online courses: MIT OCW Quantum Physics, IBM Qiskit Textbook, Coursera/edX quantum specializations. Textbooks: Nielsen & Chuang, Preskill lecture notes, Wilde\'s Quantum Information Theory. Platforms: IBM Quantum Experience, Amazon Braket, Google Cirq, Xanadu PennyLane. Communities: Qiskit community, Quantum Open Source Foundation...',
-        },
-        {
-          id: 'projects',
-          title: 'Practical Projects & Skill Development',
-          status: 'in_progress',
-          content: 'Beginner: implement basic quantum circuits (Bell states, teleportation) on Qiskit. Intermediate: build a variational quantum eigensolver (VQE) for molecular simulation. Advanced: implement quantum error correction codes, contribute to open-source quantum libraries...',
-        },
-        {
-          id: 'career',
-          title: 'Career Development & Continuous Learning',
-          status: 'in_progress',
-          content: 'Career paths: quantum software engineer, quantum algorithm researcher, quantum hardware engineer, quantum application scientist. Industry demand growing in finance, pharma, logistics, cybersecurity. Key conferences: QIP, APS March Meeting, IEEE Quantum Week...',
-        },
-      ],
-    },
-    {
-      id: 'polishing',
-      title: 'Polishing',
-      status: 'pending',
-    },
-  ];
-
-  const togglePhase = (phaseId: string) => {
-    setExpandedPhases(prev => ({ ...prev, [phaseId]: !prev[phaseId] }));
-  };
-
-  const toggleStep = (stepId: string) => {
-    setExpandedSteps(prev => ({ ...prev, [stepId]: !prev[stepId] }));
-  };
-
-  // Tabs state
-  const [openTabs, setOpenTabs] = useState<{ id: string, title: string, type: 'welcome' | 'pdf' | 'search' }[]>([
-    { id: 'welcome', title: 'Welcome_...', type: 'welcome' }
-  ]);
-  const [activeTabId, setActiveTabId] = useState<string>('welcome');
-  const [expandedPaperId, setExpandedPaperId] = useState<string | null>(null);
-
-  // Resizer state
-  const [workspaceHeight, setWorkspaceHeight] = useState(50);
-  const [isDragging, setIsDragging] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const outputSettingsRef = useRef<HTMLDivElement>(null);
-
-  const reportTypeOptions = [
-    {
-      value: 'Academic Survey',
-      label: 'Academic Survey',
-      description: 'Literature-based overview of academic papers, methods, and research trends.'
-    },
-    {
-      value: 'Deep Research',
-      label: 'Deep Research',
-      description: 'Insights from web and industry sources, including markets, companies, and emerging signals.'
-    }
-  ];
-
-  const reportLengthOptions = [
-    {
-      value: 'Short version',
-      label: 'Short version',
-      detail: '3-5 minutes',
-      description: 'Rapid structured overview, lighter than deep research'
-    },
-    {
-      value: 'Standard version',
-      label: 'Standard version',
-      detail: '1-2 hours',
-      description: 'Evidence-traced survey draft with balanced depth'
-    }
-  ];
-
-  const selectedReportType = reportTypeOptions.find((option) => option.value === reportType);
-  const selectedReportLength = reportLengthOptions.find((option) => option.value === reportLength);
+  // Derived
   const isAcademicSurvey = reportType === 'Academic Survey';
-  const isIndustryReport = reportType === 'Deep Research';
-  const canAttemptSurvey = surveyPrompt.trim() !== '';
-  const isReportSettingsComplete = reportType !== '' && (isIndustryReport || reportLength !== '');
-  const canSubmitSurvey = isReportSettingsComplete && surveyPrompt.trim() !== '';
-  const surveySubmitHint = surveyPrompt.trim() === ''
-    ? 'Describe your topic to generate the report'
-    : !isReportSettingsComplete
-      ? 'Choose report settings to continue'
-      : 'Generate report';
-  const surveyPlaceholder = !reportType
-    ? 'Describe your topic, goals, or key questions here, then choose the output type...'
-    : reportType === 'Academic Survey'
-      ? 'Describe the research topic, key questions, representative papers, methods, or frontier directions you want reviewed. This mode uses academic papers and scholarly sources...'
-      : 'Describe the industry topic, target market, leading players, use cases, investment signals, or business risks you want analyzed. This mode uses web and industry sources...';
+  const isIndustryReport = reportType === 'Research Report';
+  const isFreeWriting = reportType === 'Free Writing';
+  const isReportSettingsComplete = reportType !== '' && (isIndustryReport || isFreeWriting || reportLength !== '');
+  const showResearchPanel = isResearchInProgress || ((isIndustryReport || isAcademicSurvey) && !isFreeWriting);
 
-  const handleSurveySubmit = () => {
-    if (!canAttemptSurvey) return;
-    if (selectedAction === 'deep_survey') {
-      if (!isReportSettingsComplete) {
-        setIsOutputSettingsOpen(false);
-        setIsReportSettingsModalOpen(true);
-        return;
-      }
-      setResearchPrompt(surveyPrompt);
-      setIsResearchInProgress(true);
-      setCurrentPage('project_workspace');
-    } else {
-      setResearchPrompt(surveyPrompt);
-      setCurrentPage('project_workspace');
-    }
-  };
+  // Research progress hook
+  const { researchPhases, expandedPhases, phaseStatuses, togglePhase } = useResearchProgress({
+    isResearchInProgress,
+    reportType,
+    openTabs,
+    setOpenTabs,
+    setActiveTabId,
+  });
 
-  const handleCloseReportSettingsModal = () => {
-    setIsReportSettingsModalOpen(false);
+  // Handlers
+  const handleReportTypeSelect = (value: string) => {
+    setReportType(value);
+    if (value === 'Research Report' || value === 'Free Writing') setReportLength('');
   };
 
   const handleConfirmReportSettings = () => {
     if (!isReportSettingsComplete) return;
     setIsReportSettingsModalOpen(false);
-    setResearchPrompt(surveyPrompt);
-    setIsResearchInProgress(true);
+
+    if (isFreeWriting) {
+      setIsResearchInProgress(false);
+      if (!openTabs.find((t) => t.id === 'free_writing_draft')) {
+        setOpenTabs((prev) => [...prev, { id: 'free_writing_draft', title: 'Untitled Draft', type: 'welcome' }]);
+      }
+      setActiveTabId('free_writing_draft');
+    } else {
+      const greeting = `I can help you generate a ${isIndustryReport ? 'comprehensive industry research report' : 'detailed academic survey'}. Please describe your topic, key questions, or goals. You can also upload reference files for better context.`;
+      setChatMessages([{ role: 'ai', content: greeting }]);
+      setIsResearchInProgress(false);
+    }
     setCurrentPage('project_workspace');
   };
 
-  const handleReportTypeSelect = (value: string) => {
-    setReportType(value);
-    if (value === 'Deep Research') {
-      setReportLength('');
+  const handleChatSubmit = () => {
+    if (!initialInput.trim()) return;
+    setResearchPrompt(initialInput);
+    setChatMessages((prev) => [...prev, { role: 'user', content: initialInput }]);
+    setIsResearchInProgress(true);
+    setInitialInput('');
+  };
+
+  const handleSwitchMode = (mode: string) => {
+    setReportType(mode);
+    if (mode === 'Research Report' || mode === 'Free Writing') setReportLength('');
+
+    if (mode === 'Free Writing') {
+      setIsResearchInProgress(false);
+      setChatMessages([]);
+      if (!openTabs.find((t) => t.id === 'free_writing_draft')) {
+        setOpenTabs((prev) => [...prev, { id: 'free_writing_draft', title: 'Untitled Draft', type: 'welcome' }]);
+      }
+      setActiveTabId('free_writing_draft');
+    } else {
+      const greeting = `I can help you generate a ${mode === 'Research Report' ? 'comprehensive industry research report' : 'detailed academic survey'}. Please describe your topic, key questions, or goals. You can also upload reference files for better context.`;
+      setChatMessages([{ role: 'ai', content: greeting }]);
+      setIsResearchInProgress(false);
+      setInitialInput('');
     }
   };
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !sidebarRef.current) return;
-      const rect = sidebarRef.current.getBoundingClientRect();
-      const newHeight = ((e.clientY - rect.top) / rect.height) * 100;
-      setWorkspaceHeight(Math.min(Math.max(newHeight, 20), 80));
-    };
-    const handleMouseUp = () => setIsDragging(false);
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+  const handleTabClose = (tabId: string) => {
+    const newTabs = openTabs.filter((t) => t.id !== tabId);
+    setOpenTabs(newTabs);
+    if (activeTabId === tabId && newTabs.length > 0) {
+      setActiveTabId(newTabs[newTabs.length - 1].id);
+    } else if (newTabs.length === 0) {
+      setActiveTabId('');
     }
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging]);
+  };
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (!isOutputSettingsOpen || !outputSettingsRef.current) return;
-      if (!outputSettingsRef.current.contains(e.target as Node)) {
-        setIsOutputSettingsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOutputSettingsOpen]);
-
-  const projects = [
-    { id: 1, type: 'latex', title: '1', time: '2 hours ago' },
-    { id: 2, type: 'document', title: '我想去做agent相关的', time: '2 hours ago' },
-    { id: 3, type: 'document', title: '李飞飞的agent综述', time: '7 hours ago' },
-    { id: 4, type: 'latex', title: '1. 关于“智能体工作流', time: '7 days ago' },
-  ];
-
-  if (currentPage === 'project_workspace') {
+  // ─── Home / All Projects Page ───
+  if (currentPage !== 'project_workspace') {
     return (
-      <div 
-        className="h-screen w-full flex font-sans text-[#1f2937] overflow-hidden bg-cover bg-center"
-        style={{ backgroundImage: 'url(/BACKGROUND.png)' }}
-      >
-        {/* Leftmost Narrow Sidebar */}
-        <div className="w-[50px] h-full bg-[#fcfcfd] border-r border-gray-100 flex flex-col items-center py-4 z-20">
-          <button onClick={() => setCurrentPage('home')} className="mb-6 hover:opacity-80 transition-opacity">
-            <LogoSmall />
-          </button>
-          
-          <div className="flex flex-col gap-4 w-full items-center">
-            <button className="w-8 h-8 rounded-lg bg-[#f3e8ff] text-[#7e22ce] flex items-center justify-center">
-              <Folder size={18} />
-            </button>
-            <button className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 flex items-center justify-center transition-colors">
-              <Clock size={18} />
-            </button>
-            <button className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 flex items-center justify-center transition-colors">
-              <BookOpen size={18} />
-            </button>
-          </div>
-
-          <div className="flex-1"></div>
-
-          <div className="flex flex-col gap-4 w-full items-center">
-            <button className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 flex items-center justify-center transition-colors">
-              <div className="w-4 h-4 rounded-full border-2 border-current flex items-center justify-center text-[10px] font-bold">!</div>
-            </button>
-            <button className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 flex items-center justify-center transition-colors">
-              <Settings size={18} />
-            </button>
-            <button className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs font-medium">
-              L
-            </button>
-          </div>
-        </div>
-
-        {/* Secondary Sidebar (Workspace/Knowledge) */}
-        <div className="w-[240px] h-full bg-[#fcfcfd] border-r border-gray-100 flex flex-col z-10">
-          <div className="h-12 border-b border-gray-100 flex items-center justify-between px-4">
-            <span className="font-semibold text-sm">1</span>
-            <button className="text-gray-400 hover:text-gray-600">
-              <MoreHorizontal size={16} />
-            </button>
-          </div>
-
-          <div className="flex-1 flex flex-col min-h-0" ref={sidebarRef}>
-            {/* Workspace Section */}
-            <div 
-              className="p-4 flex flex-col min-h-0"
-              style={{ height: `${workspaceHeight}%` }}
-            >
-              <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                <div className="flex items-center gap-2 font-semibold text-sm">
-                  <FileText size={16} className="text-gray-500" />
-                  Workspace
-                </div>
-                <div className="flex items-center gap-2 text-gray-400">
-                  <button className="hover:text-gray-600"><Plus size={14} /></button>
-                  <button className="hover:text-gray-600"><FileText size={14} /></button>
-                  <button className="hover:text-gray-600"><Upload size={14} /></button>
-                  <button className="hover:text-gray-600"><Download size={14} /></button>
-                </div>
-              </div>
-            </div>
-
-            {/* Resizer */}
-            <div 
-              className="h-1 w-full cursor-row-resize group relative flex-shrink-0 z-20"
-              onMouseDown={(e) => { e.preventDefault(); setIsDragging(true); }}
-            >
-              <div className={`absolute inset-x-0 top-0 h-px bg-gray-200 transition-colors ${isDragging ? 'bg-purple-500' : 'group-hover:bg-purple-400'}`}></div>
-              <div className="absolute inset-x-0 -top-1.5 -bottom-1.5 z-10"></div>
-            </div>
-
-            {/* Knowledge Section */}
-            <div className="flex-1 p-4 flex flex-col min-h-0">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2 font-semibold text-sm">
-                  <BookOpen size={16} className="text-gray-500" />
-                  Knowledge
-                </div>
-                <div className="flex items-center gap-2 text-gray-400">
-                  <button className="hover:text-gray-600" title="New Folder"><Plus size={14} /></button>
-                  <button className="hover:text-gray-600" title="New File"><FileText size={14} /></button>
-                  <button className="hover:text-gray-600" title="Upload File"><Upload size={14} /></button>
-                  <button className="hover:text-gray-600" title="Download Zip"><Download size={14} /></button>
-                </div>
-              </div>
-
-              {/* Search Bar */}
-              <div className="mb-4">
-                <div className="bg-white rounded-xl border border-gray-200 p-1 shadow-sm flex items-center gap-1.5 relative">
-                  <div className="relative flex-shrink-0">
-                    <button 
-                      onClick={() => setIsSearchScopeDropdownOpen(!isSearchScopeDropdownOpen)}
-                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-[12px] font-medium text-gray-700 transition-colors"
-                    >
-                      {searchScope === 'web' ? <Globe size={14} /> : <BookOpen size={14} />}
-                      <span className="truncate max-w-[80px]">
-                        {searchScope === 'web' ? 'Web' : 'Paper'}
-                      </span>
-                      <ChevronDown size={14} className="text-gray-500" />
-                    </button>
-                    
-                    {isSearchScopeDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-2 w-[200px] bg-white rounded-xl shadow-[0_4px_24px_rgb(0,0,0,0.12)] border border-gray-100 p-1.5 z-50 flex flex-col gap-1">
-                        <div 
-                          className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${searchScope === 'web' ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
-                          onClick={() => {
-                            setSearchScope('web');
-                            setIsSearchScopeDropdownOpen(false);
-                          }}
-                        >
-                          <div className="flex items-start gap-2">
-                            <Globe size={16} className={`mt-0.5 flex-shrink-0 ${searchScope === 'web' ? 'text-blue-600' : 'text-gray-500'}`} />
-                            <div className="flex flex-col">
-                              <span className={`text-[14px] font-medium leading-tight mb-0.5 ${searchScope === 'web' ? 'text-blue-700' : 'text-gray-900'}`}>Web</span>
-                              <span className="text-[11px] text-gray-500 leading-tight">Best sources from web</span>
-                            </div>
-                          </div>
-                          {searchScope === 'web' && <Check size={16} className="text-blue-600" />}
-                        </div>
-                        
-                        <div 
-                          className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${searchScope === 'paper' ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
-                          onClick={() => {
-                            setSearchScope('paper');
-                            setIsSearchScopeDropdownOpen(false);
-                          }}
-                        >
-                          <div className="flex items-start gap-2">
-                            <div className="w-[16px] h-[16px] mt-0.5 flex-shrink-0">
-                              <BookOpen size={16} className={searchScope === 'paper' ? 'text-blue-600' : 'text-gray-500'} />
-                            </div>
-                            <div className="flex flex-col">
-                              <span className={`text-[14px] font-medium leading-tight mb-0.5 ${searchScope === 'paper' ? 'text-blue-700' : 'text-gray-900'}`}>Paper</span>
-                              <span className="text-[11px] text-gray-500 leading-tight">Academic articles</span>
-                            </div>
-                          </div>
-                          {searchScope === 'paper' && <Check size={16} className="text-blue-600" />}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="w-px h-4 bg-gray-200 flex-shrink-0"></div>
-
-                  <input 
-                    type="text" 
-                    placeholder="Search..." 
-                    className="w-full bg-transparent border-none outline-none text-[13px] text-gray-800 placeholder:text-gray-500 min-w-0 px-1"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        if (!openTabs.find(t => t.id === 'agent_workflows')) {
-                          setOpenTabs([...openTabs, { id: 'agent_workflows', title: 'Search: "Agent workflows"', type: 'search' }]);
-                        }
-                        setActiveTabId('agent_workflows');
-                      }
-                    }}
-                  />
-                  <button 
-                    onClick={() => {
-                      if (!openTabs.find(t => t.id === 'agent_workflows')) {
-                        setOpenTabs([...openTabs, { id: 'agent_workflows', title: 'Search: "Agent workflows"', type: 'search' }]);
-                      }
-                      setActiveTabId('agent_workflows');
-                    }}
-                    className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors flex-shrink-0"
-                  >
-                    <ArrowRight size={14} className="text-gray-500" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Knowledge Files List */}
-              <div className="flex-1 overflow-y-auto flex flex-col gap-1 -mx-2 px-2">
-                {/* Uploaded File */}
-                <div 
-                  className="flex items-center gap-2 p-1.5 rounded-md hover:bg-gray-100 group cursor-pointer transition-colors"
-                  onClick={() => {
-                    if (!openTabs.find(t => t.id === 'agent_review')) {
-                      setOpenTabs([...openTabs, { id: 'agent_review', title: '李飞飞的agent综述.pdf', type: 'pdf' }]);
-                    }
-                    setActiveTabId('agent_review');
-                  }}
-                >
-                  <input type="checkbox" defaultChecked className="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer" onClick={(e) => e.stopPropagation()} />
-                  <FileText size={14} className="text-blue-500 flex-shrink-0" />
-                  <span className="text-xs text-gray-700 truncate flex-1" title="李飞飞的agent综述.pdf">李飞飞的agent综述.pdf</span>
-                </div>
-                
-                {/* Search Results Folder/File */}
-                <div 
-                  className="flex items-center gap-2 p-1.5 rounded-md bg-purple-50/50 border border-purple-100/50 hover:bg-purple-50 group cursor-pointer mt-1 transition-colors"
-                  onClick={() => {
-                    if (!openTabs.find(t => t.id === 'agent_workflows')) {
-                      setOpenTabs([...openTabs, { id: 'agent_workflows', title: 'Search: "Agent workflows"', type: 'search' }]);
-                    }
-                    setActiveTabId('agent_workflows');
-                  }}
-                >
-                  <input type="checkbox" defaultChecked className="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer" onClick={(e) => e.stopPropagation()} />
-                  <Globe size={14} className="text-purple-500 flex-shrink-0" />
-                  <div className="flex flex-col flex-1 min-w-0">
-                    <span className="text-xs text-gray-800 font-medium truncate" title="Search: Agent workflows">Search: "Agent workflows"</span>
-                    <span className="text-[10px] text-gray-500">5 sources selected</span>
-                  </div>
-                </div>
-
-                {/* Another Uploaded File (Unchecked) */}
-                <div 
-                  className="flex items-center gap-2 p-1.5 rounded-md hover:bg-gray-100 group cursor-pointer transition-colors mt-1"
-                  onClick={() => {
-                    if (!openTabs.find(t => t.id === 'experiment_data')) {
-                      setOpenTabs([...openTabs, { id: 'experiment_data', title: 'experiment_data_v2.csv', type: 'pdf' }]);
-                    }
-                    setActiveTabId('experiment_data');
-                  }}
-                >
-                  <input type="checkbox" className="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer" onClick={(e) => e.stopPropagation()} />
-                  <FileText size={14} className="text-blue-500 flex-shrink-0" />
-                  <span className="text-xs text-gray-500 truncate flex-1" title="experiment_data_v2.csv">experiment_data_v2.csv</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 h-full flex p-4 gap-4 relative">
-          {/* Left Panel */}
-          <div className="flex-1 flex flex-col gap-4 z-10">
-
-            {isResearchInProgress ? (
-              /* Research In-Progress: SciMaster takes full left panel */
-              <div className="flex-1 rounded-2xl bg-white/80 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-xl flex flex-col overflow-hidden">
-                {/* Header */}
-                <div className="h-12 border-b border-gray-100 flex items-center justify-between px-4 flex-shrink-0">
-                  <div className="flex items-center gap-2 font-bold text-sm">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 rounded-full bg-[#d8b4fe]"></div>
-                      <div className="w-2 h-2 rounded-full bg-[#c084fc]"></div>
-                    </div>
-                    SciMaster
-                  </div>
-                  <div className="flex items-center gap-3 text-gray-400">
-                    <button className="hover:text-gray-600"><Plus size={16} /></button>
-                    <button className="hover:text-gray-600"><RotateCcw size={16} /></button>
-                    <button className="hover:text-gray-600"><Minus size={16} /></button>
-                  </div>
-                </div>
-
-                {/* Scrollable research content */}
-                <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5">
-                  {/* User message 1 */}
-                  <div className="flex justify-end">
-                    <div className="max-w-[75%] bg-[#f9fafb] border border-gray-200 rounded-2xl rounded-tr-md px-4 py-3 text-[14px] text-gray-800 leading-relaxed">
-                      Basics of quantum technology
-                    </div>
-                  </div>
-
-                  {/* AI follow-up question */}
-                  <div className="flex items-start gap-3">
-                    <img src="/sci图标.svg" alt="SciMaster" className="w-7 h-7 rounded-md flex-shrink-0 mt-0.5" />
-                    <div className="max-w-[80%] text-[14px] text-gray-800 leading-relaxed">
-                      <p>Which aspect of quantum technology would you like to explore — for example, quantum computing, quantum communication, or the fundamental principles of quantum physics?</p>
-                    </div>
-                  </div>
-
-                  {/* User message 2 */}
-                  <div className="flex justify-end">
-                    <div className="max-w-[75%] bg-[#f9fafb] border border-gray-200 rounded-2xl rounded-tr-md px-4 py-3 text-[14px] text-gray-800 leading-relaxed">
-                      All of them
-                    </div>
-                  </div>
-
-                  {/* Research Phases: Thinking → Writing → Polishing */}
-                  <div className="space-y-6">
-                    {researchPhases.map((phase, phaseIndex) => {
-                      const isPhaseExpanded = expandedPhases[phase.id];
-                      const phaseIcon = phase.status === 'completed'
-                        ? <Check size={14} className="text-white" strokeWidth={3} />
-                        : phase.status === 'in_progress'
-                          ? <Loader2 size={14} className="text-white animate-spin" />
-                          : <span className="text-[10px] text-white font-bold">{phaseIndex + 1}</span>;
-                      const phaseBg = phase.status === 'completed'
-                        ? 'bg-[#a78bfa]'
-                        : phase.status === 'in_progress'
-                          ? 'bg-[#f59e0b]'
-                          : 'bg-gray-300';
-                      const phaseTextColor = phase.status === 'pending' ? 'text-gray-400' : 'text-[#1e1b4b]';
-
-                      return (
-                        <div key={phase.id}>
-                          {/* Phase header */}
-                          <button
-                            onClick={() => togglePhase(phase.id)}
-                            className="flex items-center gap-3 w-full text-left group mb-3"
-                          >
-                            <div className={`w-6 h-6 rounded-full ${phaseBg} flex items-center justify-center flex-shrink-0`}>
-                              {phaseIcon}
-                            </div>
-                            <span className={`text-[16px] font-bold ${phaseTextColor} tracking-wide`}>
-                              {phase.title}
-                            </span>
-                            {phase.status === 'in_progress' && (
-                              <span className="text-[11px] text-[#f59e0b] font-medium bg-[#fef3c7] px-2 py-0.5 rounded-full">In progress</span>
-                            )}
-                            {phase.status === 'completed' && (
-                              <span className="text-[11px] text-[#7c3aed] font-medium bg-[#f3e8ff] px-2 py-0.5 rounded-full">Done</span>
-                            )}
-                            <span className="ml-auto text-gray-400 group-hover:text-gray-600 transition-colors">
-                              {isPhaseExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                            </span>
-                          </button>
-
-                          {/* Phase content */}
-                          {isPhaseExpanded && phase.status !== 'pending' && (
-                            <div className="ml-3 border-l-2 border-gray-100 pl-6">
-                              {/* Thinking / Polishing: stream content */}
-                              {phase.streamContent && (
-                                <div className="bg-[#faf7ff] rounded-xl border border-[#e9d5ff] p-4 mb-3">
-                                  <p className="text-[13px] text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                    {phase.streamContent}
-                                  </p>
-                                  {phase.status === 'in_progress' && (
-                                    <span className="inline-block w-[6px] h-[16px] bg-[#7c3aed] animate-pulse ml-0.5 align-middle rounded-sm" />
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Writing: parallel sections */}
-                              {phase.sections && (
-                                <div className="space-y-3">
-                                  {phase.sections.map((step) => {
-                                    const isExpanded = expandedSteps[step.id];
-                                    const borderColor = step.status === 'completed'
-                                      ? 'border-l-[#a78bfa]'
-                                      : step.status === 'in_progress'
-                                        ? 'border-l-[#f59e0b]'
-                                        : 'border-l-gray-200';
-
-                                    return (
-                                      <div key={step.id} className={`border-l-[3px] ${borderColor} pl-4`}>
-                                        <button
-                                          onClick={() => toggleStep(step.id)}
-                                          className="flex items-center gap-2 w-full text-left group"
-                                        >
-                                          <span className={`text-[14px] font-semibold ${
-                                            step.status === 'pending' ? 'text-gray-400' : 'text-[#7c3aed]'
-                                          }`}>
-                                            {step.title}
-                                          </span>
-                                          {step.status === 'in_progress' && (
-                                            <Loader2 size={13} className="text-[#f59e0b] animate-spin" />
-                                          )}
-                                          <span className="ml-auto text-gray-400 group-hover:text-gray-600 transition-colors">
-                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                          </span>
-                                        </button>
-
-                                        {isExpanded && step.status !== 'pending' && (
-                                          <div className="mt-2">
-                                            <div className="bg-white rounded-xl border border-gray-100 p-4">
-                                              {step.content ? (
-                                                <p className="text-[13px] text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                                  {step.content}
-                                                </p>
-                                              ) : (
-                                                <div className="flex items-center gap-2 text-[13px] text-gray-400">
-                                                  <Loader2 size={14} className="animate-spin text-[#f59e0b]" />
-                                                  Generating...
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Pending phase placeholder */}
-                          {phase.status === 'pending' && (
-                            <div className="ml-3 border-l-2 border-dashed border-gray-200 pl-6 py-2">
-                              <span className="text-[12px] text-gray-400 italic">Waiting for previous phase to complete...</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Loading dots */}
-                  {researchPhases.some(p => p.status === 'in_progress') && (
-                    <div className="flex items-center gap-1.5 pl-4 pt-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-[#c084fc] animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                      <div className="w-2.5 h-2.5 rounded-full bg-[#a78bfa] animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                      <div className="w-2.5 h-2.5 rounded-full bg-[#d8b4fe] animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Bottom input (disabled during research) */}
-                <div className="p-4 bg-white border-t border-gray-100 flex-shrink-0">
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 flex items-center gap-3 opacity-60">
-                    <input
-                      type="text"
-                      placeholder="Generating report... please wait"
-                      disabled
-                      className="w-full bg-transparent border-none outline-none text-sm text-gray-400 placeholder:text-gray-400 cursor-not-allowed"
-                    />
-                    <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                      <ArrowUp size={14} className="text-white" strokeWidth={3} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Default: Editor + Chat */
-              <>
-                {/* Editor Area */}
-                <div className="flex-1 rounded-2xl bg-white/60 border border-white/80 shadow-[0_4px_20px_rgb(0,0,0,0.03)] backdrop-blur-xl p-6 flex flex-col">
-                  <div className="font-semibold text-sm mb-4">Editor</div>
-                  <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-                    Select a project file, or start chatting with SciMaster!
-                  </div>
-                </div>
-
-                {/* Chat Area */}
-                <div className="h-[320px] rounded-2xl bg-white/80 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-xl flex flex-col overflow-hidden">
-                  <div className="h-12 border-b border-gray-100 flex items-center justify-between px-4">
-                    <div className="flex items-center gap-2 font-bold text-sm">
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 rounded-full bg-[#d8b4fe]"></div>
-                        <div className="w-2 h-2 rounded-full bg-[#c084fc]"></div>
-                      </div>
-                      SciMaster
-                    </div>
-                    <div className="flex items-center gap-3 text-gray-400">
-                      <button className="hover:text-gray-600"><Plus size={16} /></button>
-                      <button className="hover:text-gray-600"><RotateCcw size={16} /></button>
-                      <button className="hover:text-gray-600"><Minus size={16} /></button>
-                    </div>
-                  </div>
-                  
-                  <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#f3e8ff] to-[#e0f2fe] flex items-center justify-center mb-4 shadow-inner">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 19L19 12L22 15L15 22L12 19Z" fill="white"/>
-                        <path d="M2 22L5 19L2 16L2 22Z" fill="white"/>
-                        <path d="M19 12L12 5L9 8L16 15L19 12Z" fill="white"/>
-                      </svg>
-                    </div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">Hi, I am Writer</h2>
-                    <p className="text-sm text-gray-400">Your dedicated partner for smarter, faster writing</p>
-                  </div>
-
-                  <div className="p-4 bg-white">
-                    <div className="rounded-xl border border-gray-200 bg-white p-3 flex flex-col gap-3">
-                      <input 
-                        type="text" 
-                        placeholder="What do you want to write today?" 
-                        className="w-full bg-transparent border-none outline-none text-sm text-gray-800 placeholder:text-gray-400"
-                      />
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 text-xs font-medium text-gray-600">
-                          <div className="relative">
-                            <button 
-                              onClick={() => setIsWriterDropdownOpen(!isWriterDropdownOpen)}
-                              className="flex items-center gap-1 hover:text-gray-900"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                              Writer <ChevronDown size={12} />
-                            </button>
-
-                            {isWriterDropdownOpen && (
-                              <div className="absolute bottom-full left-0 mb-3 w-[320px] bg-white rounded-xl shadow-[0_4px_24px_rgb(0,0,0,0.12)] border border-gray-100 p-2 flex flex-col gap-1 z-50">
-                                <button className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left">
-                                  <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-600">
-                                    <BookOpen size={16} />
-                                  </div>
-                                  <div>
-                                    <div className="font-semibold text-gray-900 text-[15px] mb-0.5">Tutor</div>
-                                    <div className="text-[13px] text-gray-500">From ideas to structured mindmap</div>
-                                  </div>
-                                </button>
-                                
-                                <button className="flex items-start gap-3 p-3 rounded-lg bg-gray-100 transition-colors text-left">
-                                  <div className="w-8 h-8 rounded-md bg-gray-200 flex items-center justify-center flex-shrink-0 text-gray-700">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                                  </div>
-                                  <div>
-                                    <div className="font-semibold text-gray-900 text-[15px] mb-0.5">Writer</div>
-                                    <div className="text-[13px] text-gray-500">Partner for smarter and faster writing</div>
-                                  </div>
-                                </button>
-                                
-                                <button className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left">
-                                  <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-600">
-                                    <BarChart2 size={16} />
-                                  </div>
-                                  <div>
-                                    <div className="font-semibold text-gray-900 text-[15px] mb-0.5">Analyzer</div>
-                                    <div className="text-[13px] text-gray-500">Data analysis, calculation, visualization</div>
-                                  </div>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          <button className="flex items-center gap-1 hover:text-gray-900">
-                            claude-4.6 <ChevronDown size={12} />
-                          </button>
-                        </div>
-                        <button className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors">
-                          <ArrowUp size={14} className="text-white" strokeWidth={3} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Right Panel: Document View */}
-          <div className="flex-1 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] flex flex-col overflow-hidden z-10 border border-gray-100">
-            {/* Tabs */}
-            <div className="flex items-center border-b border-gray-100 bg-gray-50/50 overflow-x-auto">
-              {openTabs.map(tab => (
-                <div 
-                  key={tab.id}
-                  onClick={() => setActiveTabId(tab.id)}
-                  className={`px-4 py-3 border-r border-gray-100 flex items-center gap-2 text-sm font-medium cursor-pointer transition-colors ${
-                    activeTabId === tab.id 
-                      ? 'bg-white border-t-2 border-t-purple-500 text-gray-900' 
-                      : 'bg-transparent border-t-2 border-t-transparent text-gray-500 hover:bg-gray-100'
-                  }`}
-                >
-                  <FileText size={14} className={tab.type === 'pdf' ? 'text-red-500' : 'text-blue-500'} />
-                  <span className="truncate max-w-[150px]">{tab.title}</span>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const newTabs = openTabs.filter(t => t.id !== tab.id);
-                      setOpenTabs(newTabs);
-                      if (activeTabId === tab.id && newTabs.length > 0) {
-                        setActiveTabId(newTabs[newTabs.length - 1].id);
-                      } else if (newTabs.length === 0) {
-                        setActiveTabId('');
-                      }
-                    }}
-                    className="text-gray-400 hover:text-gray-600 ml-1"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            
-            {/* Toolbar */}
-            {openTabs.find(t => t.id === activeTabId)?.type !== 'search' && (
-              <div className="h-12 border-b border-gray-100 flex items-center px-4 gap-4 text-sm text-gray-600 bg-white flex-shrink-0">
-                <button className="hover:text-gray-900"><Minus size={14} /></button>
-                <button className="flex items-center gap-1 hover:text-gray-900 font-medium">
-                  Fit Width <ChevronDown size={14} />
-                </button>
-                <button className="hover:text-gray-900"><Plus size={14} /></button>
-                <div className="w-px h-4 bg-gray-200"></div>
-                <button className="w-8 h-6 rounded bg-[#f3e8ff] text-[#7e22ce] flex items-center justify-center">
-                  <Maximize2 size={14} />
-                </button>
-                <span className="font-medium">100%</span>
-                <span className="text-gray-400">2 pages</span>
-                <button className="hover:text-gray-900 ml-auto"><ArrowDown size={14} /></button>
-              </div>
-            )}
-
-            {/* Document Content */}
-            <div className={`flex-1 overflow-y-auto relative ${openTabs.find(t => t.id === activeTabId)?.type === 'search' ? 'bg-[#f9fafb]' : 'bg-[#f0f2f5] p-6'}`}>
-              {activeTabId === 'welcome' && (
-                <div className="bg-white shadow-md border border-gray-200 w-full max-w-[794px] min-h-[1123px] mx-auto p-12 md:p-16 font-sans text-gray-800">
-                  <h1 className="text-3xl font-bold mb-6">欢迎使用 SciMaster</h1>
-                  
-                  <h2 className="text-lg font-bold mb-2">这是你的新一代科研助手。</h2>
-                  <p className="text-sm text-gray-600 mb-8 pb-6 border-b border-gray-100">
-                    这不仅仅是一个写作界面，更是一个整合了你所有研究材料的智能中枢。
-                  </p>
-
-                  <h2 className="text-lg font-bold mb-4">你现在看到的界面</h2>
-                  
-                  <h3 className="text-base font-bold mb-2">中央文件编辑区</h3>
-                  <p className="text-sm text-gray-600 mb-2">这是你的主画布，采用基于源码的结构化编辑模式。</p>
-                  <p className="text-sm text-gray-600 mb-6">
-                    你正在编写标准的 LaTeX 源代码，通过命令与环境机制精确控制公式排版、文献引用、图表布局与整体文档结构，实现高度可控的学术级排版效果。
-                  </p>
-
-                  <h3 className="text-base font-bold mb-2">AI 对话区</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    这里集成了 SciMaster 的核心 AI 模块，如 Writer、Tutor 和 Analyzer，方便你随时调用。你可以随时切换三种模式，它们各司其职：
-                  </p>
-                  
-                  <div className="space-y-3 mb-6">
-                    <p className="text-sm text-gray-600">
-                      <strong className="text-gray-900">Writer：</strong> 它是你的主笔。无论是从零起草、扩写段落，还是精准润色，它都能基于你提供的参考资料，产出学术性极强的文字。
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <strong className="text-gray-900">Tutor：</strong> 它是你的导师。当你面对空白文档毫无头绪时，开启 Tutor。它会通过多轮对话，以 <strong className="text-gray-900">思维导图 (Mindmap)</strong> 的形式帮你理清论文架构。
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <strong className="text-gray-900">Analyzer：</strong> 它是你的数据分析助手。上传实验数据，它能帮你进行复杂的计算、统计分析，并直接生成可视化的图表。
-                    </p>
-                  </div>
-
-                  <div className="w-full h-px bg-gray-100 mb-6"></div>
-
-                  <h3 className="text-base font-bold mb-2">左侧面板</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    这里是你的文件中心，分为上方的 <strong className="text-gray-900">项目文件</strong> 和下方的 <strong className="text-gray-900">知识库</strong>。
-                  </p>
-                  
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-600">
-                      <strong className="text-gray-900">项目文件：</strong> 存放你的初稿、Proposal 或实验记录。AI <strong className="text-gray-900">拥有修改权限</strong>，你可以指示它直接在这些文档上进行迭代。
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <strong className="text-gray-900">知识库：</strong> 建议放入参考文献（PDF、文档）。AI 会深度阅读它们作为写作背景，但 <strong className="text-gray-900">绝不会修改</strong> 这些文件，确保资料的完整性。
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {activeTabId === 'agent_review' && (
-                <div className="bg-white shadow-md border border-gray-200 w-full max-w-[794px] min-h-[1123px] mx-auto p-12 md:p-16 font-serif text-gray-800">
-                  <h1 className="text-2xl font-bold text-center mb-6">A Survey on Large Language Model based Autonomous Agents</h1>
-                  <div className="text-center text-sm mb-8 italic">
-                    <p>Lei Wang, Chen Ma, Xueyang Feng, Zeyu Zhang, Hao Yang, Jingsen Zhang, Zhiyuan Chen, Jiakai Tang, Xu Chen, Yankai Lin, Wayne Xin Zhao, Zhewei Wei, Ji-Rong Wen</p>
-                  </div>
-                  
-                  <h2 className="text-lg font-bold mb-3 uppercase">Abstract</h2>
-                  <p className="text-sm text-justify mb-6 leading-relaxed">
-                    Large language models (LLMs) have achieved remarkable success, demonstrating significant potential in human-like intelligence. However, they still face limitations in solving complex, real-world tasks. To bridge this gap, researchers have proposed LLM-based autonomous agents...
-                  </p>
-                  
-                  <h2 className="text-lg font-bold mb-3 uppercase">1. Introduction</h2>
-                  <p className="text-sm text-justify mb-4 leading-relaxed">
-                    Autonomous agents have long been a prominent research focus in artificial intelligence. Previous research in this field often focuses on training agents with limited knowledge within isolated environments...
-                  </p>
-                  <p className="text-sm text-justify mb-4 leading-relaxed">
-                    Recently, through training on vast amounts of web knowledge, LLMs have demonstrated potential in achieving human-level intelligence. This has sparked a surge in studies investigating LLM-based autonomous agents...
-                  </p>
-                  
-                  <div className="w-full h-48 bg-gray-50 border border-gray-200 my-6 flex items-center justify-center text-gray-400 text-sm">
-                    [Figure 1: The general architecture of LLM-based autonomous agents]
-                  </div>
-                  
-                  <h2 className="text-lg font-bold mb-3 uppercase">2. Agent Architecture</h2>
-                  <p className="text-sm text-justify mb-4 leading-relaxed">
-                    The architecture of an LLM-based autonomous agent typically consists of a profiling module, a memory module, a planning module, and an action module...
-                  </p>
-                </div>
-              )}
-
-              {activeTabId === 'agent_workflows' && (
-                <div className="w-full h-full flex flex-col font-sans text-gray-800">
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-8 py-3 border-b border-gray-200 bg-white shadow-sm flex-shrink-0">
-                    <div className="flex items-center gap-6">
-                      <div className="text-[15px] font-bold text-gray-900">123 <span className="text-gray-500 font-normal text-[13px]">Results</span></div>
-                      
-                      <div className="flex items-center gap-2">
-                        <button className="px-3 py-1 bg-blue-600 text-white text-[13px] rounded-md font-medium">Anytime</button>
-                        <button className="px-3 py-1 text-gray-600 hover:bg-gray-100 text-[13px] rounded-md transition-colors">Since 2025</button>
-                        <button className="px-3 py-1 text-gray-600 hover:bg-gray-100 text-[13px] rounded-md transition-colors">Since 2024</button>
-                        <button className="px-3 py-1 text-gray-600 hover:bg-gray-100 text-[13px] rounded-md transition-colors">Custom Range</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* List */}
-                  <div className="flex-1 overflow-y-auto p-8 space-y-4">
-                    {/* Item 1 */}
-                    <div className="bg-white border border-gray-200 rounded-xl p-4 flex gap-4 hover:shadow-md transition-shadow group">
-                      <div className="pt-1 flex-shrink-0">
-                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                      </div>
-                      <div className="flex-1 min-w-0 flex flex-col">
-                        <h3 className="text-[16px] font-semibold text-blue-700 hover:underline cursor-pointer mb-1.5 leading-snug">Multiscale modeling of inelastic materials with Thermodynamics-based Artificial Neural Networks (TANN)</h3>
-                        <p className="text-[13px] text-gray-600 mb-3 line-clamp-2 leading-relaxed">
-                          This paper introduces a novel multiscale modeling framework that integrates thermodynamics-based artificial neural networks (TANN) to predict the inelastic behavior of complex materials, ensuring thermodynamic consistency across scales.
-                        </p>
-                        <div className="flex flex-wrap items-center justify-between gap-3 mt-auto">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-100 text-[11px] font-medium">
-                              <FileText size={12} />
-                              Computer Methods in Applied Mechanics and Engineering 398, 115190 (2022)
-                            </div>
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-100 text-[11px] font-medium">
-                              <Calendar size={12} />
-                              2021-08-30
-                            </div>
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-100 text-[11px] font-medium">
-                              arXiv: 2108.13137
-                            </div>
-                          </div>
-                          <button className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors flex-shrink-0">
-                            <FolderPlus size={14} />
-                            加入知识库
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Item 2 */}
-                    <div className="bg-white border border-gray-200 rounded-xl p-4 flex gap-4 hover:shadow-md transition-shadow group">
-                      <div className="pt-1 flex-shrink-0">
-                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                      </div>
-                      <div className="flex-1 min-w-0 flex flex-col">
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 
-                            className="text-[16px] font-semibold text-blue-700 hover:underline cursor-pointer mb-1.5 leading-snug"
-                            onClick={() => setExpandedPaperId(expandedPaperId === 'paper2' ? null : 'paper2')}
-                          >
-                            Learning the solution operator of parametric partial differential equations with physics-informed DeepOnets
-                          </h3>
-                          <button onClick={() => setExpandedPaperId(expandedPaperId === 'paper2' ? null : 'paper2')} className="text-gray-400 hover:text-gray-600">
-                            {expandedPaperId === 'paper2' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
-                          </button>
-                        </div>
-                        
-                        {expandedPaperId !== 'paper2' && (
-                          <p className="text-[13px] text-gray-600 mb-3 line-clamp-2 leading-relaxed">
-                            We propose a physics-informed DeepONet architecture to learn the solution operator of parametric partial differential equations (PDEs), demonstrating significant improvements in generalization and accuracy.
-                          </p>
-                        )}
-                        
-                        {expandedPaperId === 'paper2' && (
-                          <div className="bg-gray-50 p-3 rounded-lg text-[13px] text-gray-700 mb-3 leading-relaxed">
-                            <h4 className="font-semibold mb-1">摘要</h4>
-                            Deep operator networks (DeepONets) are receiving increased attention thanks to their demonstrated capability to approximate nonlinear operators between infinite-dimensional Banach spaces. However, despite their remarkable early promise, they typically require large training data-sets consisting of paired input-output observations which may be expensive to obtain...
-                          </div>
-                        )}
-
-                        <div className="flex flex-wrap items-center justify-between gap-3 mt-auto">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-100 text-[11px] font-medium">
-                              <Calendar size={12} />
-                              2021-03-19
-                            </div>
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-100 text-[11px] font-medium">
-                              arXiv: 2103.10974
-                            </div>
-                          </div>
-                          <button className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors flex-shrink-0">
-                            <FolderPlus size={14} />
-                            加入知识库
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Item 3 */}
-                    <div className="bg-white border border-gray-200 rounded-xl p-4 flex gap-4 hover:shadow-md transition-shadow group">
-                      <div className="pt-1 flex-shrink-0">
-                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                      </div>
-                      <div className="flex-1 min-w-0 flex flex-col">
-                        <h3 className="text-[16px] font-semibold text-blue-700 hover:underline cursor-pointer mb-1.5 leading-snug">Unsupervised discovery of interpretable hyperelastic constitutive laws</h3>
-                        <p className="text-[13px] text-gray-600 mb-3 line-clamp-2 leading-relaxed">
-                          An unsupervised machine learning approach is presented for discovering interpretable hyperelastic constitutive laws directly from full-field displacement data, without requiring stress measurements.
-                        </p>
-                        <div className="flex flex-wrap items-center justify-between gap-3 mt-auto">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-100 text-[11px] font-medium">
-                              <FileText size={12} />
-                              Computer Methods in Applied Mechanics and Engineering
-                            </div>
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-100 text-[11px] font-medium">
-                              <Calendar size={12} />
-                              2020-10-26
-                            </div>
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-100 text-[11px] font-medium">
-                              arXiv: 2010.13496
-                            </div>
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-yellow-50 text-yellow-700 border border-yellow-100 text-[11px] font-medium">
-                              <Star size={12} />
-                              IF: 7.3
-                            </div>
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 text-[11px] font-medium">
-                              引用: 239
-                            </div>
-                          </div>
-                          <button className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors flex-shrink-0">
-                            <FolderPlus size={14} />
-                            加入知识库
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Item 4 */}
-                    <div className="bg-white border border-gray-200 rounded-xl p-4 flex gap-4 hover:shadow-md transition-shadow group">
-                      <div className="pt-1 flex-shrink-0">
-                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                      </div>
-                      <div className="flex-1 min-w-0 flex flex-col">
-                        <h3 className="text-[16px] font-semibold text-blue-700 hover:underline cursor-pointer mb-1.5 leading-snug">A physics-informed 3D surrogate model for elastic fields in polycrystals</h3>
-                        <p className="text-[13px] text-gray-600 mb-3 line-clamp-2 leading-relaxed">
-                          This work develops a physics-informed 3D surrogate model capable of accurately predicting elastic fields in polycrystalline materials under various loading conditions.
-                        </p>
-                        <div className="flex flex-wrap items-center justify-between gap-3 mt-auto">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-100 text-[11px] font-medium">
-                              <FileText size={12} />
-                              Computer Methods in Applied Mechanics and Engineering
-                            </div>
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-100 text-[11px] font-medium">
-                              <Calendar size={12} />
-                              2025-06-01
-                            </div>
-                          </div>
-                          <button className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors flex-shrink-0">
-                            <FolderPlus size={14} />
-                            加入知识库
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTabId === 'experiment_data' && (
-                <div className="bg-white shadow-md border border-gray-200 w-full max-w-[794px] min-h-[1123px] mx-auto p-12 md:p-16 font-mono text-gray-800 text-sm">
-                  <h1 className="text-xl font-bold mb-6 font-sans">experiment_data_v2.csv</h1>
-                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="border-b-2 border-gray-200 bg-gray-50">
-                          <th className="p-3 font-semibold">id</th>
-                          <th className="p-3 font-semibold">timestamp</th>
-                          <th className="p-3 font-semibold">model</th>
-                          <th className="p-3 font-semibold">accuracy</th>
-                          <th className="p-3 font-semibold">latency_ms</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b border-gray-100">
-                          <td className="p-3">1</td>
-                          <td className="p-3">2023-10-01 10:00</td>
-                          <td className="p-3">gpt-4</td>
-                          <td className="p-3">0.92</td>
-                          <td className="p-3">1200</td>
-                        </tr>
-                        <tr className="border-b border-gray-100">
-                          <td className="p-3">2</td>
-                          <td className="p-3">2023-10-01 10:05</td>
-                          <td className="p-3">claude-3</td>
-                          <td className="p-3">0.94</td>
-                          <td className="p-3">850</td>
-                        </tr>
-                        <tr className="border-b border-gray-100">
-                          <td className="p-3">3</td>
-                          <td className="p-3">2023-10-01 10:10</td>
-                          <td className="p-3">gemini-pro</td>
-                          <td className="p-3">0.91</td>
-                          <td className="p-3">920</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {activeTabId === '' && (
-                <div className="flex items-center justify-center h-full text-gray-400">
-                  No document open
-                </div>
-              )}
-              
-              {/* Scrollbar Track Mockup */}
-              <div className="absolute right-2 top-2 bottom-2 w-3 bg-gray-100 rounded-full flex flex-col items-center py-1">
-                <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-b-[4px] border-l-transparent border-r-transparent border-b-gray-400 mb-1"></div>
-                <div className="w-2 h-32 bg-gray-400 rounded-full mt-1"></div>
-                <div className="flex-1"></div>
-                <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-gray-400 mt-1"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <>
+        <HomePage
+          currentPage={currentPage}
+          selectedAction={selectedAction}
+          onPageChange={setCurrentPage}
+          onActionSelect={setSelectedAction}
+          onOpenReportSettings={() => setIsReportSettingsModalOpen(true)}
+        />
+        {isReportSettingsModalOpen && (
+          <ReportSettingsModal
+            reportType={reportType}
+            reportLength={reportLength}
+            onSelectType={handleReportTypeSelect}
+            onSelectLength={setReportLength}
+            onReset={() => { setReportType(''); setReportLength(''); }}
+            onClose={() => setIsReportSettingsModalOpen(false)}
+            onConfirm={handleConfirmReportSettings}
+            canSubmit={isReportSettingsComplete}
+          />
+        )}
+      </>
     );
   }
 
+  // ─── Workspace Page ───
   return (
-    <div className="min-h-screen w-full flex flex-col bg-gradient-to-r from-[#fdfcff] to-[#eefafc] font-sans text-[#1f2937]">
-      {/* Header */}
-      <header className="h-[60px] w-full sticky top-0 z-20 px-6 flex items-center justify-between bg-white/80 backdrop-blur-md border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          <Logo />
-          <div className="px-2 py-0.5 rounded-md bg-[#f3e8ff] text-[#7e22ce] text-xs font-semibold tracking-wide">
-            Beta
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="h-8 px-3 rounded-full border border-gray-200 bg-gray-50/50 text-gray-600 text-sm font-medium flex items-center gap-2 hover:bg-gray-100 transition-colors">
-            <Globe size={14} />
-            English
-          </button>
-          <button className="h-8 px-3 rounded-full border border-gray-200 bg-gray-50/50 text-gray-600 text-sm font-medium flex items-center gap-2 hover:bg-gray-100 transition-colors">
-            <PlusCircle size={14} className="text-[#9333ea]" />
-            1000
-          </button>
-        </div>
-      </header>
+    <div
+      className="h-screen w-full flex font-sans text-[#1f2937] overflow-hidden bg-cover bg-center relative"
+      style={{ backgroundImage: 'url(/BACKGROUND.png)' }}
+    >
+      {showNotificationPrompt && <NotificationPrompt onClose={() => setShowNotificationPrompt(false)} />}
 
-      <div className="flex flex-1 relative">
-        {/* Sidebar */}
-        <aside className="hidden md:flex w-[260px] h-[calc(100vh-60px)] sticky top-[60px] bg-[#fcfcfd] border-r border-gray-100 pt-6 px-4 pb-6 flex-col z-10">
-          <button 
-            onClick={() => setCurrentPage('project_workspace')}
-            className="w-full h-10 rounded-full border border-[#d8b4fe] bg-white text-[#9333ea] text-sm font-medium flex items-center justify-center hover:bg-purple-50 transition-colors"
-          >
-            <span className="mr-2 text-lg leading-none">+</span> New Project
-          </button>
+      <WorkspaceSidebar
+        onNavigateHome={() => setCurrentPage('home')}
+        openTabs={openTabs}
+        setOpenTabs={setOpenTabs}
+        setActiveTabId={setActiveTabId}
+      />
 
-          <nav className="mt-6 flex flex-col gap-1">
-            <button 
-              onClick={() => setCurrentPage('home')}
-              className={`h-10 rounded-lg px-3 flex items-center gap-3 transition-colors ${currentPage === 'home' ? 'bg-[#f3e8ff] text-[#7e22ce]' : 'bg-transparent text-gray-500 hover:bg-gray-100'}`}
-            >
-              <Home size={18} />
-              <span className="text-sm font-medium">Home</span>
-            </button>
-            <button 
-              onClick={() => setCurrentPage('all_projects')}
-              className={`h-10 rounded-lg px-3 flex items-center gap-3 transition-colors ${currentPage === 'all_projects' ? 'bg-[#f3e8ff] text-[#7e22ce]' : 'bg-transparent text-gray-500 hover:bg-gray-100'}`}
-            >
-              <Folder size={18} />
-              <span className="text-sm font-medium">All Projects</span>
-            </button>
-          </nav>
-
-          <div className="mt-6 rounded-xl bg-gradient-to-b from-[#f5f3ff] to-[#ede9fe] p-4 relative">
-            <h3 className="text-sm text-gray-700 font-medium">Redeem Invitation Code</h3>
-            <p className="text-xs text-[#8b5cf6] mt-1">Get 1000 credits to use!</p>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8b5cf6]">
-              <Gift size={24} strokeWidth={1.5} />
-            </div>
-          </div>
-
-          <div className="flex-1"></div>
-
-          <button className="h-11 rounded-xl bg-gradient-to-r from-[#67e8f9] to-[#a78bfa] text-white text-sm font-semibold shadow-lg shadow-blue-500/20 hover:opacity-90 transition-opacity">
-            Turn your feedback into rewards!
-          </button>
-
-          <div className="mt-6 flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-gray-600 text-white text-sm flex items-center justify-center font-medium">
-              L
-            </div>
-            <span className="flex-1 text-sm text-gray-700 font-medium truncate">Lingchen</span>
-            <button className="text-gray-400 hover:text-gray-600 transition-colors">
-              <Settings size={18} />
-            </button>
-          </div>
-        </aside>
-
-        {/* Main Panel */}
-        <main className={`flex-1 flex flex-col pt-10 px-8 pb-12 relative z-10 ${currentPage === 'home' ? 'items-center' : 'items-stretch'}`}>
-          {currentPage === 'home' ? (
-            <>
-              {/* Hero */}
-              <div className="text-center flex flex-col items-center max-w-3xl w-full mt-6">
-                <h1 className="font-serif text-[56px] font-bold leading-tight text-[#2a2136]">
-                  Meet Your AI Scientist Friend
-                </h1>
-                <p className="text-lg text-gray-500 mt-4">
-                  Search, ideate, compute, experiment, write —— seamlessly unified
-                </p>
-              </div>
-
-              {/* Two Feature Cards */}
-              <div className="mt-10 w-full max-w-[800px] grid grid-cols-2 gap-4">
-                {/* Idea Brainstorming Card */}
-                <button
-                  onClick={() => setSelectedAction(selectedAction === 'idea_brainstorming' ? null : 'idea_brainstorming')}
-                  className={`text-left rounded-2xl border p-6 transition-all hover:shadow-md ${
-                    selectedAction === 'idea_brainstorming'
-                      ? 'border-[#c084fc] bg-[#faf5ff] shadow-[0_4px_16px_rgba(139,92,246,0.12)]'
-                      : 'border-gray-200/80 bg-white/90 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-[28px]">💡</span>
-                    <h3 className="text-[18px] font-bold text-[#1e1b4b]">Idea Brainstorming</h3>
-                  </div>
-                  <p className="text-[13px] text-gray-500 leading-relaxed">
-                    Iterate on concepts, build structures, and find novel angles.
-                  </p>
-                </button>
-
-                {/* Synthesize Draft Card */}
-                <button
-                  onClick={() => setSelectedAction(selectedAction === 'deep_survey' ? null : 'deep_survey')}
-                  className={`text-left rounded-2xl border p-6 transition-all hover:shadow-md ${
-                    selectedAction === 'deep_survey'
-                      ? 'border-[#c084fc] bg-[#faf5ff] shadow-[0_4px_16px_rgba(139,92,246,0.12)]'
-                      : 'border-gray-200/80 bg-white/90 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-[28px]">🔍</span>
-                    <h3 className="text-[18px] font-bold text-[#1e1b4b]">Synthesize Draft</h3>
-                  </div>
-                  <p className="text-[13px] text-gray-500 leading-relaxed">
-                    Synthesize literature reviews or generate instant, data-rich survey reports from your sources.
-                  </p>
-                </button>
-              </div>
-
-              {/* Unified Input Box */}
-              <div className="mt-5 w-full max-w-[800px] rounded-2xl bg-white/90 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-xl p-5 flex flex-col transition-all">
-                {selectedAction === 'deep_survey' ? (
-                  <>
-                    <div className="flex-1 flex flex-col">
-                      <textarea 
-                        value={surveyPrompt}
-                        onChange={(e) => setSurveyPrompt(e.target.value)}
-                        placeholder={surveyPlaceholder}
-                        className="w-full flex-1 bg-transparent border-none outline-none text-[15px] text-gray-800 placeholder:text-gray-400 resize-none min-h-[56px]"
-                      />
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                      <div className="flex items-center gap-4 text-sm text-gray-600 relative">
-                        <div className="relative" ref={outputSettingsRef}>
-                          <button 
-                            onClick={() => setIsOutputSettingsOpen(!isOutputSettingsOpen)}
-                            className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
-                          >
-                            <Settings size={14} className="text-gray-400" /> 
-                            {isReportSettingsComplete
-                              ? (isAcademicSurvey ? `${reportType} · ${selectedReportLength?.label}` : reportType)
-                              : 'Type'}
-                          </button>
-                          
-                          {isOutputSettingsOpen && (
-                            <div className="absolute bottom-full left-0 mb-2 w-[420px] max-w-[calc(100vw-64px)] bg-white rounded-2xl shadow-[0_12px_36px_rgb(0,0,0,0.12)] border border-gray-100 p-4 z-50">
-                              <div className="flex items-center justify-between mb-2.5">
-                                <div>
-                                  <h3 className="text-[13px] font-semibold text-gray-800">Report Settings</h3>
-                                  <p className="text-[11px] text-gray-500 mt-0.5">Choose report type and output scope</p>
-                                </div>
-                                <button 
-                                  onClick={() => {
-                                    setReportType('');
-                                    setReportLength('');
-                                  }}
-                                  className="text-[11px] text-gray-400 hover:text-gray-600 underline"
-                                >
-                                  Reset
-                                </button>
-                              </div>
-                              <div className="space-y-3">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <span className="w-5 h-5 rounded-full bg-[#f3e8ff] text-[#7e22ce] text-[11px] font-semibold flex items-center justify-center">1</span>
-                                    <label className="text-xs font-medium text-gray-700">Choose report type</label>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {reportTypeOptions.map((option) => {
-                                      const isSelected = reportType === option.value;
-                                      return (
-                                        <button
-                                          key={option.value}
-                                          onClick={() => handleReportTypeSelect(option.value)}
-                                          className={`w-full text-left rounded-xl border p-3 transition-all ${
-                                            isSelected
-                                              ? 'border-[#d8b4fe] bg-[#f5f3ff] shadow-[0_4px_12px_rgba(139,92,246,0.10)]'
-                                              : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
-                                          }`}
-                                        >
-                                          <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                              <div className={`text-[13px] font-semibold ${isSelected ? 'text-[#6b21a8]' : 'text-gray-800'}`}>
-                                                {option.label}
-                                              </div>
-                                              <div className={`mt-1 text-[11px] leading-4 ${isSelected ? 'text-[#7e22ce]' : 'text-gray-500'}`}>
-                                                {option.description}
-                                              </div>
-                                            </div>
-                                            <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-[#8b5cf6] bg-[#8b5cf6] text-white' : 'border-gray-300 bg-white text-transparent'}`}>
-                                              <Check size={12} strokeWidth={3} />
-                                            </div>
-                                          </div>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                                {isAcademicSurvey && (
-                                  <div>
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <span className="w-5 h-5 rounded-full bg-[#f3e8ff] text-[#7e22ce] text-[11px] font-semibold flex items-center justify-center">2</span>
-                                      <label className="text-xs font-medium text-gray-700">Choose survey depth</label>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      {reportLengthOptions.map((option) => {
-                                        const isSelected = reportLength === option.value;
-                                        return (
-                                          <button
-                                            key={option.value}
-                                            onClick={() => setReportLength(option.value)}
-                                            className={`w-full text-left rounded-xl border p-3 transition-all ${
-                                              isSelected
-                                                ? 'border-[#d8b4fe] bg-[#f5f3ff] shadow-[0_4px_12px_rgba(139,92,246,0.10)]'
-                                                : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
-                                            }`}
-                                          >
-                                            <div className="flex items-start justify-between gap-2">
-                                              <div>
-                                                <div className={`text-[13px] font-semibold ${isSelected ? 'text-[#6b21a8]' : 'text-gray-800'}`}>
-                                                  {option.label}
-                                                </div>
-                                                <div className="mt-1">
-                                                  <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                                                    isSelected
-                                                      ? 'bg-[#ede9fe] text-[#7e22ce]'
-                                                      : 'bg-[#f5f3ff] text-[#7e22ce]'
-                                                  }`}>
-                                                    {option.detail}
-                                                  </span>
-                                                </div>
-                                                <div className={`mt-1 text-[11px] leading-4 ${isSelected ? 'text-[#7e22ce]' : 'text-gray-500'}`}>
-                                                  {option.description}
-                                                </div>
-                                              </div>
-                                              <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-[#8b5cf6] bg-[#8b5cf6] text-white' : 'border-gray-300 bg-white text-transparent'}`}>
-                                                <Check size={12} strokeWidth={3} />
-                                              </div>
-                                            </div>
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-                                {isIndustryReport && (
-                                  <div>
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <span className="w-5 h-5 rounded-full bg-[#f3e8ff] text-[#7e22ce] text-[11px] font-semibold flex items-center justify-center">2</span>
-                                      <label className="text-xs font-medium text-gray-700">Estimated output</label>
-                                    </div>
-                                    <div className="rounded-xl border border-[#d8b4fe] bg-[#faf7ff] px-4 py-3">
-                                      <div className="text-[13px] font-semibold text-[#2f2854]">Deep Research</div>
-                                      <div className="mt-2">
-                                        <span className="inline-flex rounded-full bg-[#f5f3ff] px-2.5 py-1 text-[11px] font-medium text-[#7e22ce]">
-                                          15 minutes
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <button className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                          <Paperclip size={14} className="text-gray-400" /> Add reference files
-                        </button>
-                      </div>
-                      <button
-                        onClick={handleSurveySubmit}
-                        disabled={!canAttemptSurvey}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-sm flex-shrink-0 ml-4 ${
-                          canAttemptSurvey
-                            ? 'bg-gradient-to-tr from-[#dbeafe] to-[#e9d5ff] hover:opacity-90'
-                            : 'bg-gray-100 cursor-not-allowed opacity-70'
-                        }`}
-                        title={surveySubmitHint}
-                      >
-                        <ArrowUp size={18} className={canAttemptSurvey ? 'text-white' : 'text-gray-400'} strokeWidth={2} />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <textarea 
-                      value={surveyPrompt}
-                      onChange={(e) => setSurveyPrompt(e.target.value)}
-                      placeholder="Ask or refine your topic..."
-                      className="w-full bg-transparent border-none outline-none text-[15px] text-gray-800 placeholder:text-gray-400 resize-none min-h-[56px]"
-                    />
-                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                      <div className="flex items-center gap-6 text-sm text-gray-600">
-                        <button className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                          Editor style <ChevronDown size={14} className="text-gray-400" />
-                        </button>
-                        <button className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                          claude-4.6 <ChevronDown size={14} className="text-gray-400" />
-                        </button>
-                        <button className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                          <Paperclip size={14} className="text-gray-400" /> Working files
-                        </button>
-                        <button className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                          <Paperclip size={14} className="text-gray-400" /> Knowledge files
-                        </button>
-                      </div>
-                      <button
-                        onClick={handleSurveySubmit}
-                        disabled={!canAttemptSurvey}
-                        className={`h-10 px-5 rounded-full flex items-center justify-center gap-2 transition-all shadow-sm flex-shrink-0 text-[13px] font-semibold ${
-                          canAttemptSurvey
-                            ? 'bg-gradient-to-tr from-[#dbeafe] to-[#e9d5ff] text-white hover:opacity-90'
-                            : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-70'
-                        }`}
-                      >
-                        Manuscript Writing
-                        <ArrowUp size={15} className={canAttemptSurvey ? 'text-white' : 'text-gray-400'} strokeWidth={2.5} />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Recent Projects */}
-              <div className="mt-16 w-full max-w-[800px] rounded-2xl bg-white/80 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-base font-bold text-gray-900">Recent projects</h2>
-                  <div className="w-64 h-9 rounded-lg border border-gray-200 bg-white px-3 flex items-center gap-2">
-                    <Search size={16} className="text-gray-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Search workspace..." 
-                      className="bg-transparent border-none outline-none text-sm text-gray-800 placeholder:text-gray-400 w-full"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col">
-                  <div className="py-4 flex items-center justify-between border-b border-gray-100">
-                    <span className="text-sm text-gray-800">1</span>
-                    <span className="text-sm text-gray-400">2 hours ago</span>
-                  </div>
-                  <div className="py-4 flex items-center justify-between border-b border-gray-100">
-                    <span className="text-sm text-gray-800">我想去做agent相关的</span>
-                    <span className="text-sm text-gray-400">2 hours ago</span>
-                  </div>
-                </div>
-              </div>
-
-              {isReportSettingsModalOpen && (
-                <div
-                  className="fixed inset-0 z-50 bg-[rgba(17,24,39,0.18)] backdrop-blur-[2px] flex items-center justify-center px-4"
-                  onClick={handleCloseReportSettingsModal}
-                >
-                  <div
-                    className="w-full max-w-[620px] rounded-[28px] bg-white p-7 shadow-[0_24px_60px_rgba(15,23,42,0.18)] border border-white/70"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-[18px] font-semibold text-[#2a2136]">Choose report type</h3>
-                        <p className="mt-3 text-[15px] leading-6 text-[#6b7280]">
-                          Choose the output type before generating. Academic Survey also lets you choose the survey depth.
-                        </p>
-                      </div>
-                      <button
-                        onClick={handleCloseReportSettingsModal}
-                        className="text-[#9ca3af] hover:text-[#6b7280] transition-colors"
-                      >
-                        <X size={20} />
-                      </button>
-                    </div>
-
-                    <div className="mt-8 space-y-6">
-                      <div>
-                        <div className="mb-3 text-[13px] font-medium text-[#4b5563]">Choose report type</div>
-                        <div className="space-y-3">
-                          {reportTypeOptions.map((option) => {
-                            const isSelected = reportType === option.value;
-                            return (
-                              <button
-                                key={option.value}
-                                onClick={() => handleReportTypeSelect(option.value)}
-                                className={`w-full rounded-2xl border px-5 py-4 text-left transition-all ${
-                                  isSelected
-                                    ? 'border-[#8b5cf6] bg-[#f5f3ff] shadow-[0_4px_12px_rgba(139,92,246,0.10)]'
-                                    : 'border-[#e5e7eb] bg-white hover:border-[#d8b4fe] hover:bg-[#faf7ff]'
-                                }`}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-[#8b5cf6]' : 'border-[#d1d5db]'}`}>
-                                    <div className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-[#8b5cf6]' : 'bg-transparent'}`}></div>
-                                  </div>
-                                  <div>
-                                    <div className="text-[16px] font-semibold text-[#2f2854]">{option.label}</div>
-                                    <div className="mt-1 text-[13px] text-[#6b7280]">{option.description}</div>
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {isAcademicSurvey && (
-                        <div>
-                          <div className="mb-3 text-[13px] font-medium text-[#4b5563]">Survey depth</div>
-                          <div className="grid grid-cols-2 gap-3">
-                            {reportLengthOptions.map((option) => {
-                              const isSelected = reportLength === option.value;
-                              return (
-                                <button
-                                  key={option.value}
-                                  onClick={() => setReportLength(option.value)}
-                                  className={`rounded-2xl border px-4 py-4 text-left transition-all ${
-                                    isSelected
-                                      ? 'border-[#8b5cf6] bg-[#f5f3ff] shadow-[0_4px_12px_rgba(139,92,246,0.10)]'
-                                      : 'border-[#e5e7eb] bg-white hover:border-[#d8b4fe] hover:bg-[#faf7ff]'
-                                  }`}
-                                >
-                                  <div className="text-[15px] font-semibold text-[#2f2854]">{option.label}</div>
-                                  <div className="mt-2">
-                                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                                      isSelected
-                                        ? 'bg-[#ede9fe] text-[#7e22ce]'
-                                        : 'bg-[#f5f3ff] text-[#7e22ce]'
-                                    }`}>
-                                      {option.detail}
-                                    </span>
-                                  </div>
-                                  <div className="mt-2 text-[12px] leading-5 text-[#6b7280]">{option.description}</div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                      {isIndustryReport && (
-                        <div>
-                          <div className="mb-3 text-[13px] font-medium text-[#4b5563]">Estimated output</div>
-                          <div className="rounded-2xl border border-[#d8b4fe] bg-[#faf7ff] px-5 py-4">
-                            <div className="text-[16px] font-semibold text-[#2f2854]">10+ page deep research</div>
-                            <div className="mt-2">
-                              <span className="inline-flex rounded-full bg-[#f5f3ff] px-2.5 py-1 text-[11px] font-medium text-[#7e22ce]">
-                                15 minutes
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-8 grid grid-cols-2 gap-4">
-                      <button
-                        onClick={handleCloseReportSettingsModal}
-                        className="h-[58px] rounded-2xl border border-[#e5e7eb] bg-[#f3f4f6] text-[16px] font-semibold text-[#374151] hover:bg-[#eceff3] transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleConfirmReportSettings}
-                        disabled={!isReportSettingsComplete}
-                        className={`h-[58px] rounded-2xl text-[16px] font-semibold transition-all ${
-                          isReportSettingsComplete
-                            ? 'bg-[#ede9fe] text-[#111827] hover:bg-[#e4ddfd]'
-                            : 'bg-[#f3f4f6] text-[#9ca3af] cursor-not-allowed'
-                        }`}
-                      >
-                        Confirm
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
+      {/* Main Content Area */}
+      <div className="flex-1 h-full flex p-4 gap-4 relative">
+        {/* Left Panel */}
+        <div className="flex-1 flex flex-col gap-4 z-10">
+          {showResearchPanel ? (
+            <ResearchPanel
+              chatMessages={chatMessages}
+              isResearchInProgress={isResearchInProgress}
+              researchPhases={researchPhases}
+              expandedPhases={expandedPhases}
+              phaseStatuses={phaseStatuses}
+              reportType={reportType}
+              reportLength={reportLength}
+              initialInput={initialInput}
+              onTogglePhase={togglePhase}
+              onInputChange={setInitialInput}
+              onSubmit={handleChatSubmit}
+              onNotify={() => setShowNotificationPrompt(true)}
+              onSwitchMode={handleSwitchMode}
+            />
           ) : (
-            <div className="w-full max-w-[1200px] mx-auto">
-              <div className="flex items-center justify-between mb-6">
-                <h1 className="text-[22px] font-bold text-[#1f2937]">Recent Projects</h1>
-                <button className="h-9 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-600 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  Date created (newest) <ChevronDown size={14} className="text-gray-400" />
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                {projects.map((project) => (
-                  <div 
-                    key={project.id} 
-                    onClick={() => setCurrentPage('project_workspace')}
-                    className="rounded-xl border border-gray-100 bg-white overflow-hidden shadow-[0_2px_10px_rgb(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] transition-all cursor-pointer"
-                  >
-                    <div className="h-[160px] bg-[#f4f5f7] flex items-center justify-center text-gray-400 text-sm font-medium">
-                      {project.type}
-                    </div>
-                    <div className="p-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-semibold text-[15px] text-gray-900 truncate pr-2">{project.title}</h3>
-                        <button className="text-gray-400 hover:text-gray-600 flex-shrink-0">
-                          <MoreHorizontal size={16} />
-                        </button>
-                      </div>
-                      <p className="text-[13px] text-gray-500">{project.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <DefaultChatPanel />
           )}
-        </main>
+        </div>
+
+        {/* Right Panel */}
+        <DocumentViewer
+          openTabs={openTabs}
+          activeTabId={activeTabId}
+          onTabSelect={setActiveTabId}
+          onTabClose={handleTabClose}
+        />
       </div>
     </div>
   );
