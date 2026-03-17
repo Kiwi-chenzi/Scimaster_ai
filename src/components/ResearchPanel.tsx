@@ -149,12 +149,34 @@ export function ResearchPanel({
                             const stepText = step.status === 'completed' ? 'Done' : step.status === 'in_progress' ? 'Writing' : 'Pending';
                             const stepClass = step.status === 'completed' ? 'text-gray-500' : step.status === 'in_progress' ? 'text-[#f59e0b]' : 'text-gray-400';
                             return (
-                              <div key={step.id} className="flex items-center justify-between gap-4 px-5 py-2 hover:bg-gray-50 transition-colors">
-                                <div className="flex items-center gap-2 flex-1">
-                                  <p className="text-[14px] text-gray-800">{step.title}</p>
-                                  {step.status === 'in_progress' && <Loader2 size={13} className="text-[#f59e0b] animate-spin" />}
+                              <div key={step.id} className="px-5 py-2 hover:bg-gray-50 transition-colors">
+                                <div className="flex items-center justify-between gap-4">
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <p className="text-[14px] text-gray-800">{step.title}</p>
+                                    {step.status === 'in_progress' && <Loader2 size={13} className="text-[#f59e0b] animate-spin" />}
+                                  </div>
+                                  <span className={`text-[13px] ${stepClass}`}>{stepText}</span>
                                 </div>
-                                <span className={`text-[13px] ${stepClass}`}>{stepText}</span>
+                                {step.status !== 'pending' && step.streamBlocks && step.streamBlocks.length > 0 && (
+                                  <div className="mt-2 ml-1 rounded-lg border border-gray-100 bg-[#fcfcfd] px-3 py-2.5 space-y-2">
+                                    {step.streamBlocks.map((block, blockIdx) => (
+                                      block.type === 'tool' ? (
+                                        <div key={`${step.id}-tool-${blockIdx}`} className="flex items-center gap-2 flex-wrap">
+                                          <span className="inline-flex items-center rounded-full border border-[#ddd6fe] bg-[#f5f3ff] px-2 py-0.5 text-[10px] font-semibold text-[#6d28d9]">
+                                            Tool Call
+                                          </span>
+                                          <span className="inline-flex items-center rounded-full border border-[#e5e7eb] bg-white px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                                            {block.content}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <p key={`${step.id}-text-${blockIdx}`} className="text-[12px] leading-5 text-gray-600">
+                                          {block.content}
+                                        </p>
+                                      )
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}

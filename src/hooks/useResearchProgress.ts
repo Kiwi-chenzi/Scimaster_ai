@@ -17,6 +17,31 @@ export function useResearchProgress({
   setOpenTabs,
   setActiveTabId,
 }: UseResearchProgressParams) {
+  const getSectionStreamBlocks = (sectionId: string, status: StepStatus) => {
+    if (status === 'pending') return [];
+
+    const defaultTextA =
+      'This section synthesizes key evidence, links claims to source quality, and keeps terminology consistent with the overall report framing.';
+    const defaultTextB =
+      status === 'completed'
+        ? 'Draft paragraph finalized with structured argument flow, quantitative references, and clear transitions to adjacent sections.'
+        : 'Drafting in progress with iterative refinement of logic chain, citations, and cross-section consistency checks.';
+
+    if (reportType === 'Research Report') {
+      return [
+        { type: 'text' as const, content: defaultTextA },
+        { type: 'tool' as const, content: sectionId === 'technology-analysis' ? 'Paper Search · query: "latest benchmark / architecture evidence"' : 'Web Parse · extracting latest company/product signals' },
+        { type: 'text' as const, content: defaultTextB },
+      ];
+    }
+
+    return [
+      { type: 'text' as const, content: defaultTextA },
+      { type: 'tool' as const, content: sectionId === 'introduction' || sectionId === 'conclusion' ? 'Paper Search · query: "core references and canonical works"' : 'Paper Search + Web Parse · collecting citations and open-source implementations' },
+      { type: 'text' as const, content: defaultTextB },
+    ];
+  };
+
   const [visiblePhases, setVisiblePhases] = useState<PhaseId[]>([]);
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({
     thinking: true,
@@ -52,7 +77,12 @@ export function useResearchProgress({
         id: 'writing' as PhaseId,
         title: 'Writing',
         status: phaseStatuses.writing,
-        sections: currentSections.map((s) => ({ id: s.id, title: s.title, status: sectionStatuses[s.id] ?? ('pending' as StepStatus) })),
+        sections: currentSections.map((s) => ({
+          id: s.id,
+          title: s.title,
+          status: sectionStatuses[s.id] ?? ('pending' as StepStatus),
+          streamBlocks: getSectionStreamBlocks(s.id, sectionStatuses[s.id] ?? ('pending' as StepStatus)),
+        })),
       };
     }
     return { id: 'polishing' as PhaseId, title: 'Prepare Workspace', status: phaseStatuses.polishing, streamContent: polishingContent };

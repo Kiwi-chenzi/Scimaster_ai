@@ -26,7 +26,12 @@ export interface ResearchPhase {
   title: string;
   status: PhaseStatus;
   streamContent?: string;
-  sections?: { id: string; title: string; status: StepStatus }[];
+  sections?: {
+    id: string;
+    title: string;
+    status: StepStatus;
+    streamBlocks?: { type: 'text' | 'tool'; content: string }[];
+  }[];
 }
 
 export interface ReportTypeOption {
